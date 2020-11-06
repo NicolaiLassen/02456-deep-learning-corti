@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import utils.plot_util as plot_util
 
 import wave2vec_transfer
 
@@ -11,7 +12,7 @@ train_on_gpu = torch.cuda.is_available()
 
 if __name__ == '__main__':
 
-    f_name = './pretrained_cp/wav2vec_small.pt'
+    f_name = './resources/wav2vec_small.pt'
     transfer_model = wave2vec_transfer.Wave2VecTransfer(f_name)
 
     # TODO: all from params
@@ -38,12 +39,33 @@ if __name__ == '__main__':
     # train loop for the transfer and new loss
     for epoch in range(n_epochs):
 
-        # Bookkeeping
-        test_loss = np.Inf
-        valid_loss = np.Inf
+        # Bookkeeping of loss to plot
+        train_loss = 0.0
 
         transfer_model.train()
+        ## TODO: setup train_loader for this data type
+        for data, target in train_loader:
+
+            if train_on_gpu:
+                data, target = data.cuda(), target.cuda()
+
+            optimizer.zero_grad()
+            output = transfer_model(data)
+            loss = criterion(output, target)
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item() * data.size(0)
+
+        # Bookkeeping of loss to plot
+        valid_loss = 0.0
 
         transfer_model.eval()
+
+        # plot embed vectors
+        plot_util.TSNE_embed_context_plot()
+
+
+
 
         torch.save(transfer_model.state_dict(), 'models/'.format("insert model name"))

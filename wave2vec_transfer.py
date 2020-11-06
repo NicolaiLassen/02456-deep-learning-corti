@@ -22,7 +22,7 @@ class Wave2VecTransfer(nn.Module):
 
         # step 2 harvest embed latent dim
         self.embed_z = nn.Embedding()  # TODO: use latent dim out of wave2vec
-        self.embed_c = nn.Embedding()  # TODO:
+        self.embed_c = nn.Embedding()  # TODO: same ^
 
     def forward(self, input):
         # Get embeds latent space from PretrainedWav2VecModel
@@ -38,18 +38,25 @@ class Wave2VecTransfer(nn.Module):
         return out
 
 
+# ref: https://static.googleusercontent.com/media/research.google.com/da//pubs/archive/42543.pdf
 class Vec2Word(nn.Module):
     """
-    Extracts features of the embed space to
+    Extracts features of the embed space and uses the labels to transform them into text
     """
 
     # TODO: we should convert the embeds to speech
     def __init__(self):
         super().__init__()
 
+        self.rnn
 
-# ref: https://github.com/mailong25/vietnamese-speech-recognition/blob/master/wav2vec.py
+
+    # ref: https://github.com/mailong25/vietnamese-speech-recognition/blob/master/wav2vec.py
 class PretrainedWav2VecModel(nn.Module):
+    '''
+    Learns speech representations on unlabeled data
+    '''
+
     def __init__(self, f_name):
         super().__init__()
 

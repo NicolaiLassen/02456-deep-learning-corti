@@ -8,3 +8,5 @@ requirements.txt
 ``
 
 ### The Wave2Vec model
+
+![model_idea](images/model_idea.png)
