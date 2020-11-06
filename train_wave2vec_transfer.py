@@ -14,7 +14,7 @@ if __name__ == '__main__':
     f_name = '/path/to/wav2vec.pt'
     transfer_model = wave2vec_transfer.Wave2VecTransfer(f_name)
 
-    # TODO: Set from params
+    # TODO: all from params
     parser = argparse.ArgumentParser()
 
     # TODO: wrap in train evaluate
@@ -32,14 +32,18 @@ if __name__ == '__main__':
     # ref: https://pytorch.org/docs/stable/optim.html
     optimizer = optim.Adam(transfer_model.parameters(), lr=learning_rate)
 
-    # Bookkeeping
-    valid_loss_min = np.Inf
-
     if train_on_gpu:
         transfer_model.cuda()
 
     # train loop for the transfer and new loss
     for epoch in range(n_epochs):
+
+        # Bookkeeping
+        test_loss = np.Inf
+        valid_loss = np.Inf
+
         transfer_model.train()
 
         transfer_model.eval()
+
+        torch.save(transfer_model.state_dict(), 'models/'.format("insert model name"))

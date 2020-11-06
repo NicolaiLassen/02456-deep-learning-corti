@@ -7,5 +7,3 @@ def read_audio(fname):
     wav, sr = sf.read(fname)
     assert sr == 16e3
     return wav, 16e3
-
-
