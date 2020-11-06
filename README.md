@@ -7,6 +7,6 @@ https://www.overleaf.com/2288993974qjrnyshhbqrf
 requirements.txt
 ``
 
-### The Wave2Vec model
+### The Wave2Word model
 
 ![model_idea](images/model_idea.png)
