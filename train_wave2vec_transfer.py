@@ -11,7 +11,7 @@ train_on_gpu = torch.cuda.is_available()
 
 if __name__ == '__main__':
 
-    f_name = '/path/to/wav2vec.pt'
+    f_name = './pretrained_cp/wav2vec_small.pt'
     transfer_model = wave2vec_transfer.Wave2VecTransfer(f_name)
 
     # TODO: all from params

@@ -131,6 +131,7 @@ pip-selfcheck.json
 
 /fairseq
 .idea/
+/pretrained_cp
 
 ## File-based project format:
 *.iws
