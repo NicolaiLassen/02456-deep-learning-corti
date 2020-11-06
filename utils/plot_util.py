@@ -1,7 +1,7 @@
 import seaborn as sns
+from sklearn import manifold
 
 sns.set()
-from sklearn import manifold
 
 
 def TSNE_embed_context_plot(X):
