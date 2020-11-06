@@ -49,10 +49,11 @@ if __name__ == '__main__':
                 data, target = data.cuda(), target.cuda()
 
             optimizer.zero_grad()
-
             anchor = transfer_model(data)
-            pos = models.glove_vectors.wv[target]
-            neg = models.glove_vectors.wv[target]
+
+            with torch.no_grad():
+                pos = models.glove_vectors.wv[target]
+                neg = models.glove_vectors.wv[target]
 
             loss = criterion(anchor, pos, neg)
 
