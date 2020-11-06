@@ -1,19 +1,18 @@
 import argparse
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import utils.plot_util as plot_util
 
-import wave2vec_transfer
+import models
+import utils.plot_util as plot_util
 
 train_on_gpu = torch.cuda.is_available()
 
 if __name__ == '__main__':
 
     f_name = './resources/wav2vec_small.pt'
-    transfer_model = wave2vec_transfer.Wave2VecTransfer(f_name)
+    transfer_model = models.Wave2VecTransfer(f_name)
 
     # TODO: all from params
     parser = argparse.ArgumentParser()
@@ -50,8 +49,13 @@ if __name__ == '__main__':
                 data, target = data.cuda(), target.cuda()
 
             optimizer.zero_grad()
-            output = transfer_model(data)
-            loss = criterion(output, target)
+
+            anchor = transfer_model(data)
+            pos = models.glove_vectors.wv[target]
+            neg = models.glove_vectors.wv[target]
+
+            loss = criterion(anchor, pos, neg)
+
             loss.backward()
             optimizer.step()
 
@@ -64,8 +68,5 @@ if __name__ == '__main__':
 
         # plot embed vectors
         plot_util.TSNE_embed_context_plot()
-
-
-
 
         torch.save(transfer_model.state_dict(), 'models/'.format("insert model name"))

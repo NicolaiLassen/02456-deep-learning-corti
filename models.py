@@ -1,7 +1,11 @@
+import gensim.downloader
 import torch
 import torch.nn as nn
 
 from fairseq.fairseq.models.wav2vec import Wav2VecModel
+
+# gensim word2vec embeds
+glove_vectors = gensim.downloader.load('glove-wiki-gigaword-50')
 
 
 class Wave2VecTransfer(nn.Module):
@@ -21,21 +25,36 @@ class Wave2VecTransfer(nn.Module):
         self.wave2vec = PretrainedWav2VecModel(f_name)
 
         # step 2 harvest embed latent dim
-        self.embed_z = nn.Embedding()  # TODO: use latent dim out of wave2vec
-        self.embed_c = nn.Embedding()  # TODO: same ^
+        self.embed_z = nn.Embedding(2, 2)  # TODO: use latent dim out of wave2vec
+        self.embed_c = nn.Embedding(2, 2)  # TODO: same ^
+
+        self.softmax_out = nn.Softmax(dim=1)
 
     def forward(self, input):
         # Get embeds latent space from PretrainedWav2VecModel
-        out = self.wave2vec(input)
+        z, c = self.wave2vec(input)
 
         # TODO: train via bp on our latent dim of the model
 
         # embed the z dim in our latent -> transformer
-        out = self.embed_z(out)
+        # z = self.embed_z(out)
         # embed the c dim in our latent -> transformer
-        out = self.embed_c(out)
+        # c = self.embed_c(out)
 
-        return out
+        return self.softmax_out(), z, c
+
+
+class Vec2Semantic(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+        # ref: https://huggingface.co/bert-base-uncased?
+        # step 1: use BERT embbedings
+        # self.bert_embed =
+
+        #
+        # self.rnn =
 
 
 # ref: https://static.googleusercontent.com/media/research.google.com/da//pubs/archive/42543.pdf
@@ -45,13 +64,19 @@ class Vec2Word(nn.Module):
     """
 
     # TODO: we should convert the embeds to speech
+
     def __init__(self):
         super().__init__()
 
-        self.rnn
+        # step 1:
+        self.embed_c = nn.Embedding()
 
+        # step 2: Use recurrent to prevent lossing the grad and keep the idea of a previous word
+        # self.rnn =
 
     # ref: https://github.com/mailong25/vietnamese-speech-recognition/blob/master/wav2vec.py
+
+
 class PretrainedWav2VecModel(nn.Module):
     '''
     Learns speech representations on unlabeled data
