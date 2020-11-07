@@ -133,6 +133,7 @@ pip-selfcheck.json
 /data
 .idea/
 /models
+/temp
 /resources
 
 ## File-based project format:

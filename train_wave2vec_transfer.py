@@ -6,14 +6,15 @@ import torch.optim as optim
 
 import models
 import utils.plot_util as plot_util
-from utils.preprocessor_util import Preprocessor
+from utils.preprocessor_util import AudioPreprocessor
 
 train_on_gpu = torch.cuda.is_available()
 
 if __name__ == '__main__':
 
     #
-    Preprocessor()
+    preprocessor = AudioPreprocessor()
+    preprocessor.load_data()
 
     f_name = './resources/wav2vec_small.pt'
     transfer_model = models.Wave2VecTransfer(f_name)

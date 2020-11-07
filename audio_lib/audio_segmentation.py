@@ -4,17 +4,28 @@ from shutil import copy2
 
 from pydub import AudioSegment
 
+from audio_lib.audio_io import readAudioFile
+
 
 ###
 # ref: https://github.com/mailong25/vietnamese-speech-recognition/blob/master/wav2vec.py
 ###
 
-def chunk_audio(file_path, output_path, max_len=12):
+
+def segment_audio(file_path, output_path, max_len=12):
+    '''
+
+    :param file_path:
+    :param output_path:
+    :param max_len:
+    :return:
+    '''
+
     file_name = ntpath.basename(file_path)
     audio = AudioSegment.from_wav(file_path)
 
     if len(audio) / 1000 > max_len:
-        segs = silenceRemovalWrapper(file_path)
+        segs = silence_removal_segment_wrapper(file_path)
         segs = sorted([j for i in segs for j in i])
         points = []
         total = 0
@@ -48,16 +59,18 @@ def chunk_audio(file_path, output_path, max_len=12):
         os.remove(file_path)
 
 
-def silenceRemovalWrapper(inputFile, smoothingWindow=0.5, weight=0.2, saveFile=False):
+def silence_removal_segment_wrapper(inputFile, smoothingWindow=0.5, weight=0.2, saveFile=False):
+
     if not os.path.isfile(inputFile):
         raise Exception("Input audio_lib file not found!")
+
     file = inputFile.split('/')[-1].split('.')[0]
-    [fs, x] = audioBasicIO.readAudioFile(inputFile)
-    segmentLimits = aS.silenceRemoval(x, fs, 0.03, 0.03,
-                                      smoothingWindow, weight, False)
-    for i, s in enumerate(segmentLimits):
+    [fs, x] = readAudioFile(inputFile)
+    segment_limits = aS.silenceRemoval(x, fs, 0.03, 0.03,smoothingWindow, weight, False)
+
+    for i, s in enumerate(segment_limits):
         strOut = "{0:s}_{1:.2f}-{2:.2f}.wav".format(inputFile[0:-4], s[0], s[1])
         if saveFile:
             file.write(strOut, fs, x[int(fs * s[0]):int(fs * s[1])])
 
-    return segmentLimits
+    return segment_limits

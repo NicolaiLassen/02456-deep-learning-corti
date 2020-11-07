@@ -1,6 +1,3 @@
-import soundfile as sf
-
-
 ###
 # ref: https://github.com/mailong25/vietnamese-speech-recognition/blob/master/wav2vec.py
 ###
