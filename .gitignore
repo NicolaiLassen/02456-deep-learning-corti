@@ -132,7 +132,6 @@ pip-selfcheck.json
 /fairseq
 /data
 .idea/
-/models
 /temp
 /resources
 
