@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-import models
+from models import models_old
 import utils.plot_util as plot_util
 from utils.preprocessor_util import AudioPreprocessor
 
@@ -17,7 +17,7 @@ if __name__ == '__main__':
     preprocessor.load_data()
 
     f_name = './resources/wav2vec_small.pt'
-    transfer_model = models.Wave2VecTransfer(f_name)
+    transfer_model = models_old.Wave2VecTransfer(f_name)
 
     # TODO: all from params
     parser = argparse.ArgumentParser()
@@ -57,8 +57,8 @@ if __name__ == '__main__':
             anchor = transfer_model(data)
 
             with torch.no_grad():
-                pos = models.glove_vectors.wv[target]
-                neg = models.glove_vectors.wv[target]
+                pos = models_old.glove_vectors.wv[target]
+                neg = models_old.glove_vectors.wv[target]
 
             loss = criterion(anchor, pos, neg)
 
