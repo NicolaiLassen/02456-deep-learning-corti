@@ -6,7 +6,7 @@ import torch.optim as optim
 
 import models
 import utils.plot_util as plot_util
-from utils.preprocessor_util import AudioPreprocessor
+from utils.audio_preprocessor_util import AudioPreprocessor
 
 train_on_gpu = torch.cuda.is_available()
 

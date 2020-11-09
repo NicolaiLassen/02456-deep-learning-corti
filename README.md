@@ -4,6 +4,12 @@ https://www.overleaf.com/2288993974qjrnyshhbqrf
 
 https://github.com/andi611/Self-Supervised-Speech-Pretraining-and-Representation-Learning#data-preparation
 
+https://github.com/lucidrains/electra-pytorch
+
+``
+pip install torchaudio -f https://download.pytorch.org/whl/torch_stable.html
+``
+
 ### Get started
 ``
 requirements.txt
