@@ -83,8 +83,19 @@ class ZeroPad1d(nn.Module):
 
 if __name__ == '__main__':
     # TODO: Test the network
+    import matplotlib.pyplot as plt
+
+
+    def plot_wav(waveform):
+        plt.figure(1)
+        plt.title("Test wave")
+        plt.plot(waveform[0])
+        plt.show()
+
+
     waveform, sample_rate = torchaudio.load("wav_16k_example.wav")
-    print(waveform)
+    print(waveform.shape)
+    plot_wav(waveform)
     model = Wav2vec()
     out = model(waveform)
     print(waveform)
