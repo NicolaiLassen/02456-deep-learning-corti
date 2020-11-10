@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
+import torch
 
 
 class Wav2vec(nn.Module):
@@ -94,6 +95,7 @@ if __name__ == '__main__':
 
 
     waveform, sample_rate = torchaudio.load("wav_16k_example.wav")
+    torch.unsqueeze(waveform, 1)
     print(waveform.shape)
     plot_wav(waveform)
     model = Wav2vec()

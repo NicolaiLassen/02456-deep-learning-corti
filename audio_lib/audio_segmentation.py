@@ -2,14 +2,26 @@ import ntpath
 import os
 from shutil import copy2
 
+import numpy
 from pydub import AudioSegment
 
 from audio_lib.audio_io import readAudioFile
+from audio_lib.audio_silence_removal import silenceRemoval
 
 
-###
-# ref: https://github.com/mailong25/vietnamese-speech-recognition/blob/master/wav2vec.py
-###
+def smoothMovingAvg(inputSignal, windowLen=11):
+    windowLen = int(windowLen)
+    if inputSignal.ndim != 1:
+        raise ValueError("")
+    if inputSignal.size < windowLen:
+        raise ValueError("Input vector needs to be bigger than window size.")
+    if windowLen < 3:
+        return inputSignal
+    s = numpy.r_[2 * inputSignal[0] - inputSignal[windowLen - 1::-1],
+                 inputSignal, 2 * inputSignal[-1] - inputSignal[-1:-windowLen:-1]]
+    w = numpy.ones(windowLen, 'd')
+    y = numpy.convolve(w / w.sum(), s, mode='same')
+    return y[windowLen:-windowLen + 1]
 
 
 def segment_audio(file_path, output_path, max_len=12):
@@ -60,13 +72,12 @@ def segment_audio(file_path, output_path, max_len=12):
 
 
 def silence_removal_segment_wrapper(inputFile, smoothingWindow=0.5, weight=0.2, saveFile=False):
-
     if not os.path.isfile(inputFile):
         raise Exception("Input audio_lib file not found!")
 
     file = inputFile.split('/')[-1].split('.')[0]
     [fs, x] = readAudioFile(inputFile)
-    segment_limits = aS.silenceRemoval(x, fs, 0.03, 0.03,smoothingWindow, weight, False)
+    segment_limits = silenceRemoval(x, fs, 0.03, 0.03, smoothingWindow, weight, False)
 
     for i, s in enumerate(segment_limits):
         strOut = "{0:s}_{1:.2f}-{2:.2f}.wav".format(inputFile[0:-4], s[0], s[1])

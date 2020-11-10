@@ -1,6 +1,5 @@
 import os
 from multiprocessing import Pool
-import torchaudio
 
 import librosa
 import soundfile as sf
@@ -20,6 +19,23 @@ def convert_to_16k(in_path, out_path):
     y, s = librosa.load(in_path, sr=8000)
     y_16k = librosa.resample(y, s, 16000)
     sf.write(out_path, y_16k, 16000, format=file_extension)
+
+
+# ref: https://github.com/mailong25/vietnamese-speech-recognition/blob/master/wav2vec.py
+def stereo2mono(x):
+    # (stored in a numpy array) to MONO (if it is STEREO)
+    if isinstance(x, int):
+        return -1
+    if x.ndim == 1:
+        return x
+    elif x.ndim == 2:
+        if x.shape[1] == 1:
+            return x.flatten()
+        else:
+            if x.shape[1] == 2:
+                return ((x[:, 1] / 2) + (x[:, 0] / 2))
+            else:
+                return -1
 
 
 # ref: https://github.com/mailong25/vietnamese-speech-recognition/blob/master/wav2vec.py
@@ -45,6 +61,7 @@ class AudioPreprocessor:
 
     def transcribe(self, sound_files):
         self.pool.map(preprocessing, [(sound_files[i], i, self.output_path) for i in range(0, len(sound_files))])
+        self.pool.terminate()
 
     def load_data(self, batch_size=256, test_size=0.1, valid_size=0.2):
         # Check if the file path is created for our preprocessed data

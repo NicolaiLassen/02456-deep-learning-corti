@@ -3,15 +3,16 @@ from __future__ import absolute_import
 import matplotlib.pyplot as plt
 import numpy
 
+# TODO: Read what is going on
+from utils.audio_preprocessor_util import stereo2mono
+
 
 ###
 # ref: https://github.com/mailong25/vietnamese-speech-recognition/blob/master/wav2vec.py
 ###
 
 
-# TODO: Read what is going on
 def silenceRemoval(x, fs, st_win, st_step, smoothWindow=0.5, weight=0.5, plot=False):
-
     '''
     Event Detection (silence removal)
     ARGUMENTS:
@@ -32,7 +33,7 @@ def silenceRemoval(x, fs, st_win, st_step, smoothWindow=0.5, weight=0.5, plot=Fa
         weight = 0.01
 
     # Step 1: feature extraction
-    x = audioBasicIO.stereo2mono(x)
+    x = stereo2mono(x)
     st_feats, _ = aF.stFeatureExtraction(x, fs, st_win * fs,
                                          st_step * fs)
 
