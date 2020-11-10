@@ -1,5 +1,6 @@
 import os
 from multiprocessing import Pool
+import torchaudio
 
 import librosa
 import soundfile as sf
@@ -45,11 +46,7 @@ class AudioPreprocessor:
     def transcribe(self, sound_files):
         self.pool.map(preprocessing, [(sound_files[i], i, self.output_path) for i in range(0, len(sound_files))])
 
-    def load_data(self,
-                  batch_size=256,
-                  test_size=0.1,
-                  valid_size=0.2
-                  ):
+    def load_data(self, batch_size=256, test_size=0.1, valid_size=0.2):
         # Check if the file path is created for our preprocessed data
         assert os.path.isdir(self.output_path) == True
 
@@ -57,3 +54,5 @@ class AudioPreprocessor:
                               batch_size=batch_size,
                               shuffle=True,
                               num_workers=self.n_thread)
+
+        # waveform, sample_rate = torchaudio.load(filename)

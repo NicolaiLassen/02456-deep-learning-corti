@@ -101,3 +101,5 @@ class PretrainedWav2VecModel(nn.Module):
                 z = z[0]
             c = self.model.feature_aggregator(z)
         return z, c
+
+
