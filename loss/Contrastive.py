@@ -1,40 +1,49 @@
 import torch
-import torch.nn.functional as F
+import torch.nn as nn
 
 
 class ContrastiveLoss(torch.nn.Module):
-    def __init__(self, margin=1.0):
+    def __init__(self):
         super(ContrastiveLoss, self).__init__()
-        self.margin = margin
 
     # W_k C_i + b_k
     def h_k(self, c_i):
-        return W_k * c_i + b_k
+        return torch.einsum("w,c->wc", c_i, c_i) + c_i
 
     # log σ(z_i+k h_k(c_i))
     def log_sig_probs(self, z_ik, c_i):
         z_i_k_t = torch.transpose(z_ik, 0, 1)
-        sigma = F.sigmoid(z_i_k_t * self.h_k(c_i))
+        sigma = torch.sigmoid(torch.add(z_i_k_t, z_i_k_t)
+                              # self.h_k(c_i)
+                              )
         return torch.log(sigma)
 
-    def check_type_forward(self, in_types):
-        assert len(in_types) == 3
+    # keep torch grad
+    def sum_pass(self, i, k, z, c):
+        if i == k:
+            return 0
+        return torch.add(self.log_sig_probs(z[i + k], c[i]) + 0, self.sum_pass(i + 1, k, z, c))
 
-        x0_type, x1_type, y_type = in_types
-        assert x0_type.size() == x1_type.shape
-        assert x1_type.size()[0] == y_type.shape[0]
-        assert x1_type.size()[0] > 0
-        assert x0_type.dim() == 2
-        assert x1_type.dim() == 2
-        assert y_type.dim() == 1
+    # keep torch grad
+    def cat_pass(self, T, k, z, c):
+        if k == 0:
+            return self.sum_pass(T - k, k, z, c)
+        return self.sum_pass(T - k, k, z, c)
 
-    def forward(self, z, c):
-        # self.check_type_forward((x0, x1, y))
-
+    def forward(self, z, c, T=3, k=3):
         # - sum_i=1^T-k
-        loss = 0
-        for i in range(1, T - k):
-            loss += self.log_sig_probs(z[i + k]) + self.log_sig_probs(?s)
+        return self.cat_pass(T, k, z, c)
 
 
-        return loss
+if __name__ == '__main__':
+    criterion = ContrastiveLoss()
+    model = nn.Linear(2, 2)
+    z = torch.randn(6, 1, 2)
+    c = torch.randn(6, 1, 2)
+    z = model(z)
+    c = model(c)
+    print(z)
+    loss = criterion(z, c)
+    print("loss", loss)
+    loss.backward()
+    print(model.weight.grad)
