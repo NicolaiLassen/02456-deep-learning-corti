@@ -8,27 +8,38 @@ class ContrastiveLoss(torch.nn.Module):
 
     # W_k C_i + b_k
     def h_k(self, c_i):
-        return torch.einsum("w,c->wc", c_i, c_i) + c_i
+        print(c_i)
+        # get W_k
+        # b_k
+        return torch.einsum("ci,ci->ci", c_i, c_i)
 
     # log σ(z_i+k h_k(c_i))
     def log_sig_probs(self, z_ik, c_i):
         z_i_k_t = torch.transpose(z_ik, 0, 1)
         h_k_c_i = self.h_k(c_i)
-        out = torch.add(z_i_k_t, h_k_c_i)
+        print(h_k_c_i)
+        out = torch.dot(z_i_k_t, h_k_c_i)
         out = torch.sigmoid(out)
         return torch.log(out)
 
     # keep torch grad
     def sum_pass(self, i, k, z, c):
+
         if i == k:
-            return 0
+            return self.sum_pass(i + 1, k, z, c)
+
         return torch.add(self.log_sig_probs(z[i + k], c[i]) + 0, self.sum_pass(i + 1, k, z, c))
 
     # keep torch grad
     def cat_pass(self, T, k, z, c):
+
         if k == 0:
             return self.sum_pass(T - k, k, z, c)
-        return self.sum_pass(T - k, k, z, c)
+
+        return torch.cat(
+            self.sum_pass(T - k, k, z, c),
+            self.cat_pass(T - k, 1, z, c)
+        )
 
     def forward(self, z, c, T=3, k=3):
         # - sum_i=1^T-k
@@ -42,7 +53,8 @@ if __name__ == '__main__':
     c = torch.randn(6, 1, 2)
     z = model(z)
     c = model(c)
-    print(z)
+    print(c.shape)
+    print(z.shape)
     loss = criterion(z, c)
     print("loss", loss)
     loss.backward()
