@@ -17,9 +17,9 @@ class Wav2vec(nn.Module):
 
     def forward(self, x):
         z = self.encoder(x)
-        #c = self.context(x)
+        c = self.context(z)
         # x = x.view(-1, self.num_flat_features(x))
-        return z#, c
+        return z, c
 
 
 class Encoder(nn.Module):
