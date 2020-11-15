@@ -1,7 +1,7 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
-import torch
 
 
 class Wav2vec(nn.Module):
@@ -17,9 +17,9 @@ class Wav2vec(nn.Module):
 
     def forward(self, x):
         z = self.encoder(x)
-        #c = self.context(x)
+        # c = self.context(x)
         # x = x.view(-1, self.num_flat_features(x))
-        return z#, c
+        return z  # , c
 
 
 class Encoder(nn.Module):
@@ -95,10 +95,11 @@ if __name__ == '__main__':
 
 
     waveform, sample_rate = torchaudio.load("wav_16k_example.wav")
-    #torch.unsqueeze(waveform, 1)
+    # torch.unsqueeze(waveform, 1)
     print(waveform.shape)
-    #plot_wav(waveform)
+    # plot_wav(waveform)
     model = Wav2vec()
     # For testing unsqueeze to match conv1d shape requirements
     out = model(torch.unsqueeze(waveform, 1))
-    #print(waveform)
+    print(out)
+    # print(waveform)
