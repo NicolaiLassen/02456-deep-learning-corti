@@ -13,10 +13,10 @@ class ContrastiveLoss(torch.nn.Module):
     # log σ(z_i+k h_k(c_i))
     def log_sig_probs(self, z_ik, c_i):
         z_i_k_t = torch.transpose(z_ik, 0, 1)
-        sigma = torch.sigmoid(torch.add(z_i_k_t, z_i_k_t)
-                              # self.h_k(c_i)
-                              )
-        return torch.log(sigma)
+        h_k_c_i = self.h_k(c_i)
+        out = torch.add(z_i_k_t, h_k_c_i)
+        out = torch.sigmoid(out)
+        return torch.log(out)
 
     # keep torch grad
     def sum_pass(self, i, k, z, c):
