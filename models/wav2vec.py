@@ -68,9 +68,24 @@ class Encoder(nn.Module):
 
 
 class Context(nn.Module):
-    def __init__(self):
+    def __init__(self, n_in, n_out, k,dropout, activation, layers=5):
         super(Context, self).__init__()
 
+        def conv_block(n_in, n_out, k, dropout, activation):
+            return nn.Sequential(
+                nn.Conv1d(n_in, n_out, k),
+                nn.Dropout(p=dropout),
+                nn.GroupNorm(1, n_out),
+                activation
+            )
+
+        self.conv = nn.ModuleList()
+        for i in range(0, layers):
+            self.conv.append(conv_block(n_in, n_out, k, dropout, activation))
+        self.conv = nn.Sequential(*self.conv)
+
+    def forward(self, x):
+        return self.conv(x)
 
 class ZeroPad1d(nn.Module):
     def __init__(self, pad_left, pad_right):
