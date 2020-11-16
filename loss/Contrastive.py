@@ -7,7 +7,7 @@ class ContrastiveLoss(torch.nn.Module):
         super(ContrastiveLoss, self).__init__()
 
     # log σ(Z^T . HK))
-    def log_sigma_probs(self, z_ik, h_k):
+    def log_sigmoid_probs(self, z_ik, h_k):
         z_t = torch.transpose(z_ik, 0, 1)
 
         # Z^T . HK
@@ -16,9 +16,9 @@ class ContrastiveLoss(torch.nn.Module):
         return torch.log(out)
 
     def forward(self, z, h_k):
-        # - log σ(Z . HK)) + lambda E [log σ(ZH . HK)]
+        # - log σ(Z . HK)) + λE [log σ(ZH . HK)]
         # TODO: ZH
-        return - (self.log_sigma_probs(z, h_k) + self.log_sigma_probs(z, h_k))
+        return - (self.log_sigmoid_probs(z, h_k) + self.log_sigmoid_probs(z, h_k))
 
 
 if __name__ == '__main__':
