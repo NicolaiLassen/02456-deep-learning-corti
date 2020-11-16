@@ -1,8 +1,18 @@
+import math
+
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
-import torch
-import math
+
+
+def buffered_arange(max):
+    if not hasattr(buffered_arange, "buf"):
+        buffered_arange.buf = torch.LongTensor()
+    if max > buffered_arange.buf.numel():
+        buffered_arange.buf.resize_(max)
+        torch.arange(max, out=buffered_arange.buf)
+    return buffered_arange.buf[:max]
 
 
 class Wav2vec(nn.Module):
@@ -193,10 +203,10 @@ if __name__ == '__main__':
 
 
     waveform, sample_rate = torchaudio.load("wav_16k_example.wav")
-    #torch.unsqueeze(waveform, 1)
+    # torch.unsqueeze(waveform, 1)
     print(waveform.shape)
-    #plot_wav(waveform)
+    # plot_wav(waveform)
     model = Wav2vec()
     # For testing unsqueeze to match conv1d shape requirements
     out = model(torch.unsqueeze(waveform, 1))
-    #print(waveform)
+    # print(waveform)
