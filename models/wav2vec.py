@@ -17,6 +17,7 @@ class Wav2vec(nn.Module):
         self.context = Context(10, 10, 3, 0.5, nn.ReLU())
 
         # Calculate offset for prediction module
+        # NOT SURE THAT WE NEED THIS?!
         def calc_offset():
             jin = 0
             rin = 0
