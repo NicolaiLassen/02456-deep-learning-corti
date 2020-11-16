@@ -1,8 +1,6 @@
 import gensim.downloader
-import torch
 import torch.nn as nn
-
-from fairseq.fairseq.models.wav2vec import Wav2VecModel
+import torch
 
 # gensim word2vec embeds
 glove_vectors = gensim.downloader.load('glove-wiki-gigaword-50')

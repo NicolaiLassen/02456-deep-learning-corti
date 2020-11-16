@@ -1,11 +1,10 @@
 import argparse
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
-
 import utils.plot_util as plot_util
-from models import models_old
+from loss.Contrastive import ContrastiveLoss
+from models.wav2vec import Wav2vec
 from utils.audio_preprocessor_util import AudioPreprocessor
 
 train_on_gpu = torch.cuda.is_available()
@@ -16,8 +15,7 @@ if __name__ == '__main__':
     preprocessor = AudioPreprocessor()
     preprocessor.load_data()
 
-    f_name = './resources/wav2vec_small.pt'
-    transfer_model = models_old.Wave2VecTransfer(f_name)
+    transfer_model = Wav2vec()
 
     # TODO: all from params
     parser = argparse.ArgumentParser()
@@ -28,13 +26,7 @@ if __name__ == '__main__':
     learning_rate = 0.001
     n_epochs = 500
 
-    # ref: https://pytorch.org/docs/stable/generated/torch.nn.TripletMarginLoss.html
-    # hyper
-    margin = 1.0
-    p = 2
-    criterion = nn.TripletMarginLoss(margin=margin, p=p)
-
-    # ref: https://pytorch.org/docs/stable/optim.html
+    criterion = ContrastiveLoss()
     optimizer = optim.Adam(transfer_model.parameters(), lr=learning_rate)
 
     if train_on_gpu:
@@ -54,15 +46,11 @@ if __name__ == '__main__':
                 data, target = data.cuda(), target.cuda()
 
             optimizer.zero_grad()
-            anchor = transfer_model(data)
+            z, c = transfer_model(data)
 
-            with torch.no_grad():
-                pos = models_old.glove_vectors.wv[target]
-                neg = models_old.glove_vectors.wv[target]
-
-            loss = criterion(anchor, pos, neg)
-
+            loss = criterion(z, c)
             loss.backward()
+
             optimizer.step()
 
             train_loss += loss.item() * data.size(0)
