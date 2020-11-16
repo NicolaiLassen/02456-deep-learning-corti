@@ -364,6 +364,8 @@ class Wav2VecModel(BaseFairseqModel):
 
         if self.project_features is not None:
             features = self.project_features(features)
+        # x = c
+        # features = z
         x, targets = self.wav2vec_predictions(x, features)
         result["cpc_logits"] = x
         result["cpc_targets"] = targets
@@ -625,9 +627,12 @@ class Wav2VecPredictionsModel(nn.Module):
         return negs
 
     def forward(self, x, y):
+        # x = c
+        # y = z
 
         x = x.unsqueeze(-1)
-        x = self.project_to_steps(x)  # BxCxTxS
+
+        x = self.project_to_steps(x)  # BxCxTxS, batch, channels, sequence length, steps
         x = self.dropout(x)
 
         negatives = self.sample_negatives(y)
