@@ -12,13 +12,14 @@ class ContrastiveLoss(torch.nn.Module):
     def log_sigmoid_probs(self, x, y):
         x_t = torch.transpose(x, 0, 1)
         # Z^T . HK
-        out = torch.einsum("jikt,ijkt->i", x_t, y)
-        print(out)
+        out = torch.einsum("jikt,ijkt->ijkt", x_t, y)
+        #print(out)
         out = torch.sigmoid(out)
-        print(out)
+        #print(out)
         out = torch.log(out)
-        print(out)
-        return out
+        #print(out)
+        #print(torch.sum(out))
+        return torch.sum(out)
 
     def forward(self, h_k, z, z_n):
         # - (log σ(Z . HK)) + λE [log σ(ZN . HK)])
@@ -33,10 +34,13 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(modelPre.parameters(), lr=0.0001)
     waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
 
-    for i in range(1):
+    for i in range(10):
         optimizer.zero_grad()
         z, c = modelPre(torch.unsqueeze(waveform, 1))
         z, z_n, c = modelPred(c, z)
+        print("Z: {}".format(z.shape))
+        print("Z_n: {}".format(z_n.shape))
+        print("c: {}".format(c.shape))
         z = z.unsqueeze(-1)
 
         # ### NOT SURE about this
