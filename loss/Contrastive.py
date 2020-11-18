@@ -32,16 +32,18 @@ if __name__ == '__main__':
 
     optimizer = torch.optim.Adam(modelPre.parameters(), lr=0.0001)
     waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
+
     for i in range(1):
         optimizer.zero_grad()
         z, c = modelPre(torch.unsqueeze(waveform, 1))
         z, z_n, c = modelPred(c, z)
-
         z = z.unsqueeze(-1)
-        z_n = z_n.permute([0, 2, 3, 1])
 
-        z = z.repeat(1, 1, 1, c.shape[3])
-        z_n = z_n.repeat(1, 1, 1, c.shape[3])
+        # ### NOT SURE about this
+        z_n = z_n.permute([0, 2, 3, 1])
+        z = z.repeat(1, 1, 1, c.shape[3]) # <--- add the same z for all steps of C in the future
+        z_n = z_n.repeat(1, 1, 1, c.shape[3]) # <--- add the same z_n for all steps of C in the future
+        #####################################
 
         loss = criterion(c, z, z_n)
 
