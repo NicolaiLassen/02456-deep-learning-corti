@@ -60,6 +60,15 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         self.in_c = 10
 
+        # TODO: make this a function
+        def conv_block(n_in, n_out, k, dropout, activation):
+            return nn.Sequential(
+                nn.Conv1d(n_in, n_out, k, padding=1),
+                nn.Dropout(p=dropout),
+                nn.GroupNorm(1, n_out),
+                activation
+            )
+
         # Hardcoded architecture, as the blocks are different
         self.encoder = nn.Sequential(nn.Conv1d(in_channels=1, out_channels=self.in_c, kernel_size=10, stride=5),
                                      nn.Dropout(p=dropout),
@@ -126,12 +135,12 @@ class Context(nn.Module):
         return x
 
 
-class Prediction(nn.Module):
-    def __init__(self, predictions_steps):
+class Wav2VecPrediction(nn.Module):
+    def __init__(self):
         in_dim = 10  # antal channels fra aggregator UPDATE TO USE AS ARGUMENT IN CONSTRUCTOR
         out_dim = 10  # antal outchannels fra encoder UPDATE TO USE AS ARGUMENT IN CONSTRUCTOR
-        prediction_steps = 12  # Not sure what this is? It's an argument UPDATE TO USE AS ARGUMENT IN CONSTRUCTOR
-        super(Prediction, self).__init__()
+        prediction_steps = 12  # number of future predictions It's an argument UPDATE TO USE AS ARGUMENT IN CONSTRUCTOR
+        super(Wav2VecPrediction, self).__init__()
         self.transpose_context = nn.ConvTranspose2d(in_dim, out_dim, (1, prediction_steps))
         self.sample_distance = None
         self.n_negatives = 1
@@ -142,7 +151,6 @@ class Prediction(nn.Module):
         y = y.transpose(0, 1)  # BCT -> CBT
         y = y.contiguous().view(fsz, -1)  # CBT => C(BxT)
 
-        cross_high = tsz * bsz
         high = tsz if self.sample_distance is None else min(tsz, self.sample_distance)
         assert high > 1
 
@@ -151,13 +159,11 @@ class Prediction(nn.Module):
         with torch.no_grad():
             if self.n_negatives > 0:
                 tszs = (
-                    # REMEMBER TO INCLUDE BUFFERED_ARANGE FROM UTIL
                     buffered_arange(tsz)
                         .unsqueeze(-1)
                         .expand(-1, self.n_negatives)
                         .flatten()
                 )
-
                 neg_idxs = torch.randint(
                     low=0, high=high - 1, size=(bsz, self.n_negatives * tsz)
                 )
@@ -178,6 +184,10 @@ class Prediction(nn.Module):
         c = c.unsqueeze(-1)
         # Transpose to give steps predictions into the future
         c = self.transpose_context(c)
+        # get distractor samples
+        z_n = self.sample_negatives(z)
+
+        return z, z_n, c
 
 
 class ZeroPad1d(nn.Module):
@@ -191,7 +201,6 @@ class ZeroPad1d(nn.Module):
 
 
 if __name__ == '__main__':
-    # TODO: Test the network
     import matplotlib.pyplot as plt
 
 
@@ -208,5 +217,6 @@ if __name__ == '__main__':
     # plot_wav(waveform)
     model = Wav2vec()
     # For testing unsqueeze to match conv1d shape requirements
-    out = model(torch.unsqueeze(waveform, 1))
+    z, c = model(torch.unsqueeze(waveform, 1))
+    print(z)
     # print(waveform)
