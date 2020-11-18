@@ -13,13 +13,16 @@ class ContrastiveLoss(torch.nn.Module):
         x_t = torch.transpose(x, 0, 1)
         # Z^T . HK
         out = torch.einsum("jikt,ijkt->i", x_t, y)
+        print(out)
         out = torch.sigmoid(out)
         print(out)
-        return torch.log(out)
+        out = torch.log(out)
+        print(out)
+        return out
 
     def forward(self, h_k, z, z_n):
-        # - (log σ(Z . HK)) + λE [log σ(-ZN . HK)])
-        return - (self.log_sigmoid_probs(z, h_k) + self.log_sigmoid_probs(z_n, h_k))
+        # - (log σ(Z . HK)) + λE [log σ(ZN . HK)])
+        return - (self.log_sigmoid_probs(z, h_k) + self.log_sigmoid_probs(-z_n, h_k))
 
 
 if __name__ == '__main__':
@@ -27,9 +30,9 @@ if __name__ == '__main__':
     modelPre = Wav2vec()
     modelPred = Wav2VecPrediction()
 
-    optimizer = torch.optim.Adam(modelPre.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(modelPre.parameters(), lr=0.0001)
     waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
-    for i in range(10):
+    for i in range(1):
         optimizer.zero_grad()
         z, c = modelPre(torch.unsqueeze(waveform, 1))
         z, z_n, c = modelPred(c, z)
@@ -45,4 +48,4 @@ if __name__ == '__main__':
         loss.backward()
         optimizer.step()
 
-        print("loss", loss)
+        # print("loss", loss)
