@@ -28,6 +28,7 @@ class Wav2vec(nn.Module):
 
         self.encoder = Encoder(channels=channels, activation=activation,dropout=dropout)
         self.context = Context(channels=channels, k=3, dropout=dropout, activation=activation)
+        self.prediction = Wav2VecPrediction(channels=channels)
         # Calculate offset for prediction module
         # NOT SURE THAT WE NEED THIS?!
         def calc_offset():
@@ -54,7 +55,26 @@ class Wav2vec(nn.Module):
         z = self.encoder(x)
         c = self.context(z)
         # x = x.view(-1, self.num_flat_features(x))
-        return z, c
+
+        z, z_n, c = self.prediction(c, z)
+        z_n = z_n.squeeze(0)
+
+        channels = c.shape[1]
+        length = c.shape[2]
+        k = c.shape[3]
+
+        preds = torch.zeros(3, channels * length * k)
+
+        for i in range(k):
+            preds[0][(length * channels) * i:(length * channels) * (i + 1)] = c[..., :, :, i].flatten()
+            preds[1][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(input=z[..., i:].transpose(0, 1),
+                                                                                    pad=(0, i, 0, 0), mode='constant',
+                                                                                    value=1).flatten()
+            preds[2][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(input=z_n[..., i:].transpose(0, 1),
+                                                                                    pad=(0, i, 0, 0), mode='constant',
+                                                                                    value=1).flatten()
+
+        return preds[0], preds[1], preds[2]
 
 
 class Encoder(nn.Module):
@@ -138,12 +158,9 @@ class Context(nn.Module):
 
 
 class Wav2VecPrediction(nn.Module):
-    def __init__(self):
-        in_dim = 10  # antal channels fra aggregator UPDATE TO USE AS ARGUMENT IN CONSTRUCTOR
-        out_dim = 10  # antal outchannels fra encoder UPDATE TO USE AS ARGUMENT IN CONSTRUCTOR
-        prediction_steps = 12  # number of future predictions It's an argument UPDATE TO USE AS ARGUMENT IN CONSTRUCTOR
+    def __init__(self, channels, prediction_steps=12):
         super(Wav2VecPrediction, self).__init__()
-        self.transpose_context = nn.ConvTranspose2d(in_dim, out_dim, (1, prediction_steps))
+        self.transpose_context = nn.ConvTranspose2d(channels, channels, (1, prediction_steps))
         self.sample_distance = None
         self.n_negatives = 1
 
