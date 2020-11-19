@@ -48,7 +48,7 @@ if __name__ == '__main__':
         length = c.shape[2]
         k = c.shape[3]
 
-        preds = torch.zeros(3, c.shape[2] * k * channels)
+        preds = torch.zeros(3, channels * length * k)
 
         for i in range(k):
             preds[0][(length * channels) * i:(length * channels) * (i + 1)] = c[..., :, :, i].flatten()
@@ -58,7 +58,6 @@ if __name__ == '__main__':
             preds[2][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(input=z_n[..., i:].transpose(0, 1),
                                                                                     pad=(0, i, 0, 0), mode='constant',
                                                                                     value=1).flatten()
-
         loss = criterion(preds[0], preds[1], preds[2])
         loss_values.append(loss.item())
         loss.backward()
