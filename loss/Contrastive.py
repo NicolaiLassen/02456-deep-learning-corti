@@ -1,4 +1,6 @@
+import matplotlib.pyplot as plt
 import torch
+import torch.nn.functional as F
 import torchaudio
 
 from models.wav2vec import Wav2vec, Wav2VecPrediction
@@ -10,16 +12,11 @@ class ContrastiveLoss(torch.nn.Module):
 
     # log σ(X^T . Y))
     def log_sigmoid_probs(self, x, y):
-        x_t = torch.transpose(x, 0, 1)
         # Z^T . HK
-        out = torch.einsum("jikt,ijkt->ijkt", x_t, y)
-        #print(out)
+        out = torch.dot(x, y)
         out = torch.sigmoid(out)
-        #print(out)
-        out = torch.log(out)
-        #print(out)
-        #print(torch.sum(out))
-        return torch.sum(out)
+        out = torch.log(out + 1e-7)
+        return out
 
     def forward(self, h_k, z, z_n):
         # - (log σ(Z . HK)) + λE [log σ(ZN . HK)])
@@ -31,27 +28,42 @@ if __name__ == '__main__':
     modelPre = Wav2vec()
     modelPred = Wav2VecPrediction()
 
-    optimizer = torch.optim.Adam(modelPre.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(modelPre.parameters(), lr=0.001)
     waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
 
-    for i in range(10):
+    loss_values = []
+
+    modelPre.train()
+    for i in range(100):
         optimizer.zero_grad()
         z, c = modelPre(torch.unsqueeze(waveform, 1))
         z, z_n, c = modelPred(c, z)
-        print("Z: {}".format(z.shape))
-        print("Z_n: {}".format(z_n.shape))
-        print("c: {}".format(c.shape))
-        z = z.unsqueeze(-1)
+        z_n = z_n.squeeze(0)
 
-        # ### NOT SURE about this
-        z_n = z_n.permute([0, 2, 3, 1])
-        z = z.repeat(1, 1, 1, c.shape[3]) # <--- add the same z for all steps of C in the future
-        z_n = z_n.repeat(1, 1, 1, c.shape[3]) # <--- add the same z_n for all steps of C in the future
-        #####################################
+        # print("Z: {}".format(z.shape))
+        # print("Z_n: {}".format(z_n.shape))
+        # print("c: {}".format(c.shape))
 
-        loss = criterion(c, z, z_n)
+        channels = c.shape[1]
+        length = c.shape[2]
+        k = c.shape[3]
 
+        preds = torch.zeros(3, c.shape[2] * k * channels)
+
+        for i in range(k):
+            preds[0][(length * channels) * i:(length * channels) * (i + 1)] = c[..., :, :, i].flatten()
+            preds[1][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(input=z[..., i:].transpose(0, 1),
+                                                                                    pad=(0, i, 0, 0), mode='constant',
+                                                                                    value=1).flatten()
+            preds[2][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(input=z_n[..., i:].transpose(0, 1),
+                                                                                    pad=(0, i, 0, 0), mode='constant',
+                                                                                    value=1).flatten()
+
+        loss = criterion(preds[0], preds[1], preds[2])
+        loss_values.append(loss.item())
         loss.backward()
         optimizer.step()
+        print(loss.item())
 
-        # print("loss", loss)
+    plt.plot(loss_values)
+    plt.show()
