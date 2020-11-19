@@ -21,11 +21,13 @@ class Wav2vec(nn.Module):
         super(Wav2vec, self).__init__()
         # 1 input image channel, 6 output channels, 3x3 square convolution
         # kernel
-        activation = nn.ReLU()
-        dropout = 0.0
-        self.encoder = Encoder(activation, dropout)
-        self.context = Context(10, 10, 3, 0.5, nn.ReLU())
 
+        channels = 512
+        activation = nn.ReLU()
+        dropout = 0.5
+
+        self.encoder = Encoder(channels=channels, activation=activation,dropout=dropout)
+        self.context = Context(channels=channels, k=3, dropout=dropout, activation=activation)
         # Calculate offset for prediction module
         # NOT SURE THAT WE NEED THIS?!
         def calc_offset():
@@ -56,9 +58,9 @@ class Wav2vec(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, activation, dropout):
+    def __init__(self, channels, activation, dropout):
         super(Encoder, self).__init__()
-        self.in_c = 10
+        self.channels = channels
 
         # TODO: make this a function
         def conv_block(n_in, n_out, k, dropout, activation):
@@ -70,30 +72,30 @@ class Encoder(nn.Module):
             )
 
         # Hardcoded architecture, as the blocks are different
-        self.encoder = nn.Sequential(nn.Conv1d(in_channels=1, out_channels=self.in_c, kernel_size=10, stride=5),
+        self.encoder = nn.Sequential(nn.Conv1d(in_channels=1, out_channels=self.channels, kernel_size=10, stride=5),
                                      nn.Dropout(p=dropout),
-                                     nn.GroupNorm(1, self.in_c),  # Affine, what to do?
+                                     nn.GroupNorm(1, self.channels),  # Affine, what to do?
                                      activation,
                                      # 2nd layer
-                                     nn.Conv1d(in_channels=self.in_c, out_channels=self.in_c, kernel_size=8, stride=4),
+                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=8, stride=4),
                                      nn.Dropout(p=dropout),
                                      ## See norm_block - FB_repo
-                                     nn.GroupNorm(1, self.in_c),  # Affine, what to do?
+                                     nn.GroupNorm(1, self.channels),  # Affine, what to do?
                                      activation,
                                      # 3rd layer
-                                     nn.Conv1d(in_channels=self.in_c, out_channels=self.in_c, kernel_size=4, stride=2),
+                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4, stride=2),
                                      nn.Dropout(p=dropout),
-                                     nn.GroupNorm(1, self.in_c),  # Affine, what to do?
+                                     nn.GroupNorm(1, self.channels),  # Affine, what to do?
                                      activation,
                                      # Fourth layer
-                                     nn.Conv1d(in_channels=self.in_c, out_channels=self.in_c, kernel_size=4, stride=2),
+                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4, stride=2),
                                      nn.Dropout(p=dropout),
-                                     nn.GroupNorm(1, self.in_c),  # Affine, what to do?
+                                     nn.GroupNorm(1, self.channels),  # Affine, what to do?
                                      activation,
                                      # Fifth layer
-                                     nn.Conv1d(in_channels=self.in_c, out_channels=self.in_c, kernel_size=4, stride=2),
+                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4, stride=2),
                                      nn.Dropout(p=dropout),
-                                     nn.GroupNorm(1, self.in_c),  # Affine, what to do?
+                                     nn.GroupNorm(1, self.channels),  # Affine, what to do?
                                      activation)
 
     def log_compression(self, x):
@@ -110,7 +112,7 @@ class Encoder(nn.Module):
 
 
 class Context(nn.Module):
-    def __init__(self, n_in, n_out, k, dropout, activation, layers=10):
+    def __init__(self, channels, k, dropout, activation, layers=10):
         super(Context, self).__init__()
 
         # All block are the same, so create using a function
@@ -127,7 +129,7 @@ class Context(nn.Module):
 
         # Create #layers number of conv-blocks
         for i in range(0, layers):
-            self.conv.append(conv_block(n_in, n_out, k, dropout, activation))
+            self.conv.append(conv_block(channels, channels, k, dropout, activation))
         self.conv = nn.Sequential(*self.conv)
 
     def forward(self, x):
