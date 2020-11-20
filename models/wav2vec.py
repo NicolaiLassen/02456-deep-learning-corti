@@ -197,6 +197,7 @@ class Wav2VecPrediction(nn.Module):
         ).permute(
             2, 1, 0, 3
         )  # to NxBxCxT
+
         return negs
 
     def forward(self, c, z):

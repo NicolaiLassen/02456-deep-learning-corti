@@ -1,10 +1,8 @@
 import matplotlib.pyplot as plt
 import torch
-import torch.nn.functional as F
 import torchaudio
 
-from models.wav2vec import Wav2vec, Wav2VecPrediction
-
+from models.wav2vec import Wav2vec
 
 class ContrastiveLoss(torch.nn.Module):
     def __init__(self):
@@ -14,8 +12,9 @@ class ContrastiveLoss(torch.nn.Module):
     def log_sigmoid_probs(self, x, y):
         # Z^T . HK
         out = torch.dot(x, y)
+        print(out)
         out = torch.sigmoid(out)
-        out = torch.log(out + 1e-7)
+        out = torch.log(out)
         return out
 
     def forward(self, h_k, z, z_n):
@@ -25,40 +24,18 @@ class ContrastiveLoss(torch.nn.Module):
 
 if __name__ == '__main__':
     criterion = ContrastiveLoss()
-    modelPre = Wav2vec()
-    modelPred = Wav2VecPrediction()
-
-    optimizer = torch.optim.Adam(modelPre.parameters(), lr=0.001)
+    model = Wav2vec()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.00001)
     waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
 
     loss_values = []
 
-    modelPre.train()
-    for i in range(100):
+    model.train()
+    for i in range(10):
         optimizer.zero_grad()
-        z, c = modelPre(torch.unsqueeze(waveform, 1))
-        z, z_n, c = modelPred(c, z)
-        z_n = z_n.squeeze(0)
+        z, z_n, c = model(torch.unsqueeze(waveform, 1))
 
-        # print("Z: {}".format(z.shape))
-        # print("Z_n: {}".format(z_n.shape))
-        # print("c: {}".format(c.shape))
-
-        channels = c.shape[1]
-        length = c.shape[2]
-        k = c.shape[3]
-
-        preds = torch.zeros(3, channels * length * k)
-
-        for i in range(k):
-            preds[0][(length * channels) * i:(length * channels) * (i + 1)] = c[..., :, :, i].flatten()
-            preds[1][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(input=z[..., i:].transpose(0, 1),
-                                                                                    pad=(0, i, 0, 0), mode='constant',
-                                                                                    value=1).flatten()
-            preds[2][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(input=z_n[..., i:].transpose(0, 1),
-                                                                                    pad=(0, i, 0, 0), mode='constant',
-                                                                                    value=1).flatten()
-        loss = criterion(preds[0], preds[1], preds[2])
+        loss = criterion(z, z_n, c)
         loss_values.append(loss.item())
         loss.backward()
         optimizer.step()
