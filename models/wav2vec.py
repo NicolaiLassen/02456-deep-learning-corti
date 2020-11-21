@@ -48,8 +48,8 @@ class Wav2vec(nn.Module):
         target_n_buffer = torch.zeros(channels * length * prediction_steps)
 
         # sum_k=1^K
+        # TODO clean this method to be more optim!
         for i in range(1, prediction_steps):
-            # TODO clean
             prediction_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(
                 input=c[..., :, :, i])
 
