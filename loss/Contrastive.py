@@ -25,7 +25,7 @@ class ContrastiveLoss(torch.nn.Module):
 if __name__ == '__main__':
     criterion = ContrastiveLoss()
     model = Wav2vec()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
     waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
 
     loss_values = []
