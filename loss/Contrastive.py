@@ -32,7 +32,7 @@ if __name__ == '__main__':
     model.train()
     for i in range(1000):
         optimizer.zero_grad()
-        z, z_n, c = model(torch.unsqueeze(waveform, 1))
+        c, z, z_n = model(torch.unsqueeze(waveform, 1))
 
         loss = criterion(z, z_n, c)
         print(loss.item())

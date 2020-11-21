@@ -59,7 +59,7 @@ class Wav2vec(nn.Module):
         z = self.encoder(x)
         c = self.context(z)
 
-        z, z_n, c = self.prediction(c, z)
+        c, z, z_n = self.prediction(c, z)
         z_n = z_n.squeeze(0)
 
         channels = c.shape[1]
@@ -201,4 +201,4 @@ class Wav2VecPrediction(nn.Module):
         # get distractor samples
         z_n = self.sample_negatives(z)
 
-        return z, z_n, c
+        return c, z, z_n
