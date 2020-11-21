@@ -32,7 +32,7 @@ class Wav2vec(nn.Module):
         dropout = 0.1
 
         self.encoder = Encoder(channels=channels, activation=activation, dropout=dropout)
-        self.context = Context(channels=channels, k=3, dropout=dropout, activation=activation)
+        self.context = Context(channels=channels, kernel_size=3, dropout=dropout, activation=activation)
         self.prediction = Wav2VecPrediction(channels=channels)
 
         # Calculate offset for prediction module
@@ -125,13 +125,13 @@ class Encoder(nn.Module):
 
 
 class Context(nn.Module):
-    def __init__(self, channels, k, dropout, activation, layers=10):
+    def __init__(self, channels, kernel_size, dropout, activation, layers=10):
         super(Context, self).__init__()
 
         # All block are the same, so create using a function
-        def context_conv_block(n_in, n_out, k, dropout, activation):
+        def context_conv_block(n_in, n_out, kernel_size, dropout, activation):
             return nn.Sequential(
-                nn.Conv1d(n_in, n_out, k, padding=1),
+                nn.Conv1d(n_in, n_out, kernel_size, padding=1),
                 nn.Dropout(p=dropout),
                 nn.GroupNorm(1, n_out, affine=False),
                 activation
@@ -142,7 +142,7 @@ class Context(nn.Module):
 
         # Create #layers number of conv-blocks
         for i in range(0, layers):
-            self.conv_blocks.append(context_conv_block(channels, channels, k, dropout, activation))
+            self.conv_blocks.append(context_conv_block(channels, channels, kernel_size, dropout, activation))
 
         self.context = nn.Sequential(*self.conv_blocks)
 
