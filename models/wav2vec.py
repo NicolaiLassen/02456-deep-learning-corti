@@ -34,55 +34,38 @@ class Wav2vec(nn.Module):
         self.context = Context(channels=channels, kernel_size=3, activation=activation, dropout=dropout)
         self.prediction = Wav2VecPrediction(channels=channels)
 
-        # Calculate offset for prediction module
-        # NOT SURE THAT WE NEED THIS?!
-        # def calc_offset():
-        #     jin = 0
-        #     rin = 0
-        #     for layer in next(self.encoder.children()):
-        #         if layer.__class__.__name__ == 'Conv1d':
-        #             k = layer.kernel_size[0]
-        #             stride = layer.stride[0]
-        #             if rin == 0:
-        #                 rin = k
-        #             rin = rin + (k - 1) * jin
-        #             if jin == 0:
-        #                 jin = stride
-        #             else:
-        #                 jin *= stride
-        #     offset = math.ceil(rin / jin)
-        #
-        #     return int(offset)
-        # self.offset = calc_offset()
-
     def forward(self, x):
         z = self.encoder(x)
         c = self.context(z)
-
         c, z, z_n = self.prediction(c, z)
         z_n = z_n.squeeze(0)
 
         channels = c.shape[1]
         length = c.shape[2]
         prediction_steps = c.shape[3]
-        prediction_buffer = torch.zeros(3, channels * length * prediction_steps)
+        prediction_buffer = torch.zeros(channels * length * prediction_steps)
+        target_buffer = torch.zeros(channels * length * prediction_steps)
+        target_n_buffer = torch.zeros(channels * length * prediction_steps)
 
         # sum_k=1^K
         for i in range(1, prediction_steps):
-            prediction_buffer[0][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(
+            # TODO clean
+            prediction_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(
                 input=c[..., :, :, i])
 
-            prediction_buffer[1][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(input=F.pad(
-                input=z[..., i + 1:].transpose(0, 1),
+            target_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(F.pad(
+                input=z[..., i + 1:],
                 pad=(i + 1, 0, 0, 0), mode='constant',
                 value=0))
 
-            prediction_buffer[2][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(input=F.pad(
-                input=z_n[..., i + 1:].transpose(0, 1),
+            target_n_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(F.pad(
+                input=z_n[..., i + 1:],
                 pad=(i + 1, 0, 0, 0), mode='constant',
                 value=0))
 
-        return prediction_buffer[0], prediction_buffer[1], prediction_buffer[2]
+        return prediction_buffer.view(channels, length, prediction_steps), \
+               target_buffer.view(channels, length, prediction_steps), \
+               target_n_buffer.view(channels, length, prediction_steps)
 
 
 class Encoder(nn.Module):
@@ -119,7 +102,6 @@ class Encoder(nn.Module):
     def forward(self, x):
         x = self.encoder(x)
         x = log_compression(x)
-        # TODO implement skipped connections?
         return x
 
 
@@ -195,9 +177,8 @@ class Wav2VecPrediction(nn.Module):
         return negs
 
     def forward(self, c, z):
-        c = c.unsqueeze(-1)
         # Transpose to give steps predictions into the future
-        c = self.transpose_context(c)
+        c = self.transpose_context(c.unsqueeze(-1))
         # get distractor samples
         z_n = self.sample_negatives(z)
 
