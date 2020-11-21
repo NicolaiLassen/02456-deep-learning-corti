@@ -4,6 +4,7 @@ import torchaudio
 
 from models.wav2vec import Wav2vec
 
+
 class ContrastiveLoss(torch.nn.Module):
     def __init__(self):
         super(ContrastiveLoss, self).__init__()
@@ -11,15 +12,14 @@ class ContrastiveLoss(torch.nn.Module):
     # log σ(X^T . Y))
     def log_sigmoid_probs(self, x, y):
         # Z^T . HK
-        out = torch.dot(x, y)
-        print(out)
+        out = x * y
         out = torch.sigmoid(out)
         out = torch.log(out)
         return out
 
     def forward(self, h_k, z, z_n):
-        # - (log σ(Z . HK)) + λE [log σ(ZN . HK)])
-        return - (self.log_sigmoid_probs(z, h_k) + self.log_sigmoid_probs(-z_n, h_k))
+        # - (log σ(Z^T . HK)) + λE [log σ(ZN^T . HK)])
+        return torch.sum(- (self.log_sigmoid_probs(z, h_k) + self.log_sigmoid_probs(-z_n, h_k)))
 
 
 if __name__ == '__main__':

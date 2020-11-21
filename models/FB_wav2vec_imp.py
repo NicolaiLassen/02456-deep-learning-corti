@@ -665,7 +665,7 @@ class Wav2VecPredictionsModel(nn.Module):
             end = start + (tsz - offset) * bsz * copies
             if self.infonce:
                 predictions[start:end] = torch.einsum(
-                    "bct,nbct->tbn", x[..., :-offset, i], targets[..., offset:]
+                    "bct,nbct->tbn", x[..., :, i], targets[..., offset:]
                 ).flatten()
             else:
                 pos_num = (end - start) // copies

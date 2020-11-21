@@ -26,9 +26,10 @@ class Wav2vec(nn.Module):
         activation = nn.ReLU()
         dropout = 0.5
 
-        self.encoder = Encoder(channels=channels, activation=activation,dropout=dropout)
+        self.encoder = Encoder(channels=channels, activation=activation, dropout=dropout)
         self.context = Context(channels=channels, k=3, dropout=dropout, activation=activation)
         self.prediction = Wav2VecPrediction(channels=channels)
+
         # Calculate offset for prediction module
         # NOT SURE THAT WE NEED THIS?!
         def calc_offset():
@@ -54,7 +55,6 @@ class Wav2vec(nn.Module):
     def forward(self, x):
         z = self.encoder(x)
         c = self.context(z)
-        # x = x.view(-1, self.num_flat_features(x))
 
         z, z_n, c = self.prediction(c, z)
         z_n = z_n.squeeze(0)
@@ -67,12 +67,16 @@ class Wav2vec(nn.Module):
 
         for i in range(k):
             preds[0][(length * channels) * i:(length * channels) * (i + 1)] = c[..., :, :, i].flatten()
-            preds[1][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(input=z[..., i:].transpose(0, 1),
-                                                                                    pad=(0, i, 0, 0), mode='constant',
-                                                                                    value=1).flatten()
-            preds[2][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(input=z_n[..., i:].transpose(0, 1),
-                                                                                    pad=(0, i, 0, 0), mode='constant',
-                                                                                    value=1).flatten()
+
+            preds[1][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(
+                input=z[..., i + 1:].transpose(0, 1),
+                pad=(i + 1, 0, 0, 0), mode='constant',
+                value=0).flatten()
+
+            preds[2][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(
+                input=z_n[..., i + 1:].transpose(0, 1),
+                pad=(i + 1, 0, 0, 0), mode='constant',
+                value=0).flatten()
 
         return preds[0], preds[1], preds[2]
 
@@ -97,23 +101,27 @@ class Encoder(nn.Module):
                                      nn.GroupNorm(1, self.channels),  # Affine, what to do?
                                      activation,
                                      # 2nd layer
-                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=8, stride=4),
+                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=8,
+                                               stride=4),
                                      nn.Dropout(p=dropout),
                                      ## See norm_block - FB_repo
                                      nn.GroupNorm(1, self.channels),  # Affine, what to do?
                                      activation,
                                      # 3rd layer
-                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4, stride=2),
+                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4,
+                                               stride=2),
                                      nn.Dropout(p=dropout),
                                      nn.GroupNorm(1, self.channels),  # Affine, what to do?
                                      activation,
                                      # Fourth layer
-                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4, stride=2),
+                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4,
+                                               stride=2),
                                      nn.Dropout(p=dropout),
                                      nn.GroupNorm(1, self.channels),  # Affine, what to do?
                                      activation,
                                      # Fifth layer
-                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4, stride=2),
+                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4,
+                                               stride=2),
                                      nn.Dropout(p=dropout),
                                      nn.GroupNorm(1, self.channels),  # Affine, what to do?
                                      activation)
