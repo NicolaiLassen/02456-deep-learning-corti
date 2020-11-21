@@ -144,7 +144,7 @@ class Context(nn.Module):
         for i in range(0, layers):
             self.conv_blocks.append(context_conv_block(channels, channels, k, dropout, activation))
 
-        self.context = nn.Sequential(*self.context)
+        self.context = nn.Sequential(*self.conv_blocks)
 
     def forward(self, z):
         c = self.context(z)
