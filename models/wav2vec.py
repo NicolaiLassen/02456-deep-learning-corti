@@ -32,7 +32,7 @@ class Wav2vec(nn.Module):
         dropout = 0.1
 
         self.encoder = Encoder(channels=channels, activation=activation, dropout=dropout)
-        self.context = Context(channels=channels, kernel_size=3, dropout=dropout, activation=activation)
+        self.context = Context(channels=channels, kernel_size=3, activation=activation, dropout=dropout)
         self.prediction = Wav2VecPrediction(channels=channels)
 
         # Calculate offset for prediction module
@@ -65,24 +65,25 @@ class Wav2vec(nn.Module):
 
         channels = c.shape[1]
         length = c.shape[2]
-        k = c.shape[3]
+        prediction_steps = c.shape[3]
 
-        pred_buffer = torch.zeros(3, channels * length * k)
+        prediction_buffer = torch.zeros(3, channels * length * prediction_steps)
 
-        for i in range(k):
-            pred_buffer[0][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(input=c[..., :, :, i])
+        for i in range(prediction_steps):
+            prediction_buffer[0][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(
+                input=c[..., :, :, i])
 
-            pred_buffer[1][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(input=F.pad(
+            prediction_buffer[1][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(input=F.pad(
                 input=z[..., i + 1:].transpose(0, 1),
                 pad=(i + 1, 0, 0, 0), mode='constant',
                 value=0))
 
-            pred_buffer[2][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(input=F.pad(
+            prediction_buffer[2][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(input=F.pad(
                 input=z_n[..., i + 1:].transpose(0, 1),
                 pad=(i + 1, 0, 0, 0), mode='constant',
                 value=0))
 
-        return pred_buffer[0], pred_buffer[1], pred_buffer[2]
+        return prediction_buffer[0], prediction_buffer[1], prediction_buffer[2]
 
 
 class Encoder(nn.Module):
