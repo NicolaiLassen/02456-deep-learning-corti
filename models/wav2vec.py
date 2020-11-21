@@ -65,10 +65,6 @@ class Wav2vec(nn.Module):
         channels = c.shape[1]
         length = c.shape[2]
         prediction_steps = c.shape[3]
-
-        print(channels)
-        print(length)
-        print(prediction_steps)
         prediction_buffer = torch.zeros(3, channels * length * prediction_steps)
 
         # sum_k=1^K
