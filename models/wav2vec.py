@@ -66,9 +66,13 @@ class Wav2vec(nn.Module):
         length = c.shape[2]
         prediction_steps = c.shape[3]
 
+        print(channels)
+        print(length)
+        print(prediction_steps)
         prediction_buffer = torch.zeros(3, channels * length * prediction_steps)
 
-        for i in range(prediction_steps):
+        # sum_k=1^K
+        for i in range(1, prediction_steps):
             prediction_buffer[0][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(
                 input=c[..., :, :, i])
 
@@ -103,7 +107,6 @@ class Encoder(nn.Module):
         # layer_n
         self.layers = [
             (1, channels, 10, 5),
-            (channels, channels, 8, 4),
             (channels, channels, 8, 4),
             (channels, channels, 4, 2),
             (channels, channels, 4, 2),
@@ -158,6 +161,7 @@ class Wav2VecPrediction(nn.Module):
         self.sample_distance = None
         self.n_negatives = 1
 
+    # lambda_n = 1
     def sample_negatives(self, y):
         bsz, fsz, tsz = y.shape
 

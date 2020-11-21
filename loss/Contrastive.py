@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import torch
-import torch.nn.functional as NNF
 import torchaudio
 
 from models.wav2vec import Wav2vec
@@ -16,8 +15,7 @@ class ContrastiveLoss(torch.nn.Module):
         out = x * y
         out = torch.sum(out)
         out = torch.sigmoid(out)
-        out = torch.log(out)
-        return out
+        return torch.log(out)
 
     def forward(self, h_k, z, z_n):
         # - (log σ(Z^T . HK)) + λE [log σ(ZN^T . HK)])
@@ -30,13 +28,12 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
 
-    out = NNF.normalize(waveform)
     loss_values = []
 
     model.train()
     for i in range(1000):
         optimizer.zero_grad()
-        z, z_n, c = model(torch.unsqueeze(out, 1))
+        z, z_n, c = model(torch.unsqueeze(waveform, 1))
 
         loss = criterion(z, z_n, c)
         print(loss.item())
