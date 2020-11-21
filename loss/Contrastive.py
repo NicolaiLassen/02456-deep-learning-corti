@@ -12,9 +12,9 @@ class ContrastiveLoss(torch.nn.Module):
     # log σ(X^T . Y))
     def log_sigmoid_probs(self, x, y):
         # Z^T . HK
-        out = torch.dot(x, y)
+        out = x * y
         out = torch.sigmoid(out)
-        return torch.log(out)
+        return torch.log(out).mean()
 
     def forward(self, h_k, z, z_n):
         # - (log σ(Z^T . HK)) + λE [log σ(ZN^T . HK)])
@@ -24,13 +24,13 @@ class ContrastiveLoss(torch.nn.Module):
 if __name__ == '__main__':
     criterion = ContrastiveLoss()
     model = Wav2vec()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
 
     loss_values = []
 
     model.train()
-    for i in range(1000):
+    for i in range(100):
         optimizer.zero_grad()
         c, z, z_n = model(torch.unsqueeze(waveform, 1))
 
