@@ -1,5 +1,3 @@
-import math
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,6 +13,13 @@ def buffered_arange(max):
     return buffered_arange.buf[:max]
 
 
+def log_compression(x):
+    # https://www.edn.com/log-1-x-compression/
+    x = x.abs()
+    x = x + 1
+    return x.log()
+
+
 class Wav2vec(nn.Module):
 
     def __init__(self):
@@ -24,7 +29,7 @@ class Wav2vec(nn.Module):
 
         channels = 512
         activation = nn.ReLU()
-        dropout = 0.5
+        dropout = 0.1
 
         self.encoder = Encoder(channels=channels, activation=activation, dropout=dropout)
         self.context = Context(channels=channels, k=3, dropout=dropout, activation=activation)
@@ -32,25 +37,24 @@ class Wav2vec(nn.Module):
 
         # Calculate offset for prediction module
         # NOT SURE THAT WE NEED THIS?!
-        def calc_offset():
-            jin = 0
-            rin = 0
-            for layer in next(self.encoder.children()):
-                if layer.__class__.__name__ == 'Conv1d':
-                    k = layer.kernel_size[0]
-                    stride = layer.stride[0]
-                    if rin == 0:
-                        rin = k
-                    rin = rin + (k - 1) * jin
-                    if jin == 0:
-                        jin = stride
-                    else:
-                        jin *= stride
-            offset = math.ceil(rin / jin)
-
-            return int(offset)
-
-        self.offset = calc_offset()
+        # def calc_offset():
+        #     jin = 0
+        #     rin = 0
+        #     for layer in next(self.encoder.children()):
+        #         if layer.__class__.__name__ == 'Conv1d':
+        #             k = layer.kernel_size[0]
+        #             stride = layer.stride[0]
+        #             if rin == 0:
+        #                 rin = k
+        #             rin = rin + (k - 1) * jin
+        #             if jin == 0:
+        #                 jin = stride
+        #             else:
+        #                 jin *= stride
+        #     offset = math.ceil(rin / jin)
+        #
+        #     return int(offset)
+        # self.offset = calc_offset()
 
     def forward(self, x):
         z = self.encoder(x)
@@ -63,78 +67,59 @@ class Wav2vec(nn.Module):
         length = c.shape[2]
         k = c.shape[3]
 
-        preds = torch.zeros(3, channels * length * k)
+        pred_buffer = torch.zeros(3, channels * length * k)
 
         for i in range(k):
-            preds[0][(length * channels) * i:(length * channels) * (i + 1)] = c[..., :, :, i].flatten()
+            pred_buffer[0][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(input=c[..., :, :, i])
 
-            preds[1][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(
+            pred_buffer[1][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(input=F.pad(
                 input=z[..., i + 1:].transpose(0, 1),
                 pad=(i + 1, 0, 0, 0), mode='constant',
-                value=0).flatten()
+                value=0))
 
-            preds[2][(length * channels) * i:(length * channels) * (i + 1)] = F.pad(
+            pred_buffer[2][(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(input=F.pad(
                 input=z_n[..., i + 1:].transpose(0, 1),
                 pad=(i + 1, 0, 0, 0), mode='constant',
-                value=0).flatten()
+                value=0))
 
-        return preds[0], preds[1], preds[2]
+        return pred_buffer[0], pred_buffer[1], pred_buffer[2]
 
 
 class Encoder(nn.Module):
     def __init__(self, channels, activation, dropout):
         super(Encoder, self).__init__()
-        self.channels = channels
 
-        # TODO: make this a function
-        def conv_block(n_in, n_out, k, dropout, activation):
+        def encoder_conv_block(n_in, n_out, kernel_size, stride, dropout, activation):
             return nn.Sequential(
-                nn.Conv1d(n_in, n_out, k, padding=1),
+                nn.Conv1d(n_in, n_out, kernel_size=kernel_size, stride=stride),
                 nn.Dropout(p=dropout),
-                nn.GroupNorm(1, n_out),
+                nn.GroupNorm(1, n_out, affine=True),
                 activation
             )
 
-        # Hardcoded architecture, as the blocks are different
-        self.encoder = nn.Sequential(nn.Conv1d(in_channels=1, out_channels=self.channels, kernel_size=10, stride=5),
-                                     nn.Dropout(p=dropout),
-                                     nn.GroupNorm(1, self.channels),  # Affine, what to do?
-                                     activation,
-                                     # 2nd layer
-                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=8,
-                                               stride=4),
-                                     nn.Dropout(p=dropout),
-                                     ## See norm_block - FB_repo
-                                     nn.GroupNorm(1, self.channels),  # Affine, what to do?
-                                     activation,
-                                     # 3rd layer
-                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4,
-                                               stride=2),
-                                     nn.Dropout(p=dropout),
-                                     nn.GroupNorm(1, self.channels),  # Affine, what to do?
-                                     activation,
-                                     # Fourth layer
-                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4,
-                                               stride=2),
-                                     nn.Dropout(p=dropout),
-                                     nn.GroupNorm(1, self.channels),  # Affine, what to do?
-                                     activation,
-                                     # Fifth layer
-                                     nn.Conv1d(in_channels=self.channels, out_channels=self.channels, kernel_size=4,
-                                               stride=2),
-                                     nn.Dropout(p=dropout),
-                                     nn.GroupNorm(1, self.channels),  # Affine, what to do?
-                                     activation)
+        # (in_dim, out_dim, kernel, stride)
+        # .
+        # .
+        # layer_n
+        self.layers = [
+            (1, channels, 10, 5),
+            (channels, channels, 8, 4),
+            (channels, channels, 8, 4),
+            (channels, channels, 4, 2),
+            (channels, channels, 4, 2),
+            (channels, channels, 4, 2)
+        ]
 
-    def log_compression(self, x):
-        # https://www.edn.com/log-1-x-compression/
-        x = x.abs()
-        x = x + 1
-        return x.log()
+        self.conv_blocks = nn.ModuleList()
+
+        for n_in, n_out, kernel_size, stride in self.layers:
+            self.conv_blocks.append(encoder_conv_block(n_in, n_out, kernel_size, stride, dropout, activation))
+
+        self.encoder = nn.Sequential(*self.conv_blocks)
 
     def forward(self, x):
         x = self.encoder(x)
-        x = self.log_compression(x)
+        x = log_compression(x)
         # TODO implement skipped connections?
         return x
 
@@ -144,25 +129,26 @@ class Context(nn.Module):
         super(Context, self).__init__()
 
         # All block are the same, so create using a function
-        def conv_block(n_in, n_out, k, dropout, activation):
+        def context_conv_block(n_in, n_out, k, dropout, activation):
             return nn.Sequential(
                 nn.Conv1d(n_in, n_out, k, padding=1),
                 nn.Dropout(p=dropout),
-                nn.GroupNorm(1, n_out),
+                nn.GroupNorm(1, n_out, affine=False),
                 activation
             )
 
         # Holder for conv layers
-        self.conv = nn.ModuleList()
+        self.conv_blocks = nn.ModuleList()
 
         # Create #layers number of conv-blocks
         for i in range(0, layers):
-            self.conv.append(conv_block(channels, channels, k, dropout, activation))
-        self.conv = nn.Sequential(*self.conv)
+            self.conv_blocks.append(context_conv_block(channels, channels, k, dropout, activation))
 
-    def forward(self, x):
-        x = self.conv(x)
-        return x
+        self.context = nn.Sequential(*self.context)
+
+    def forward(self, z):
+        c = self.context(z)
+        return c
 
 
 class Wav2VecPrediction(nn.Module):

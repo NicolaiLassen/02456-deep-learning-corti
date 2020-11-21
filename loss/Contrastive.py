@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import torch
+import torch.nn.functional as NNF
 import torchaudio
 
 from models.wav2vec import Wav2vec
@@ -13,33 +14,35 @@ class ContrastiveLoss(torch.nn.Module):
     def log_sigmoid_probs(self, x, y):
         # Z^T . HK
         out = x * y
+        out = torch.sum(out)
         out = torch.sigmoid(out)
         out = torch.log(out)
         return out
 
     def forward(self, h_k, z, z_n):
         # - (log σ(Z^T . HK)) + λE [log σ(ZN^T . HK)])
-        return torch.sum(- (self.log_sigmoid_probs(z, h_k) + self.log_sigmoid_probs(-z_n, h_k)))
+        return - (self.log_sigmoid_probs(z, h_k) + self.log_sigmoid_probs(-z_n, h_k))
 
 
 if __name__ == '__main__':
     criterion = ContrastiveLoss()
     model = Wav2vec()
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.00001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
 
+    out = NNF.normalize(waveform)
     loss_values = []
 
     model.train()
-    for i in range(10):
+    for i in range(1000):
         optimizer.zero_grad()
-        z, z_n, c = model(torch.unsqueeze(waveform, 1))
+        z, z_n, c = model(torch.unsqueeze(out, 1))
 
         loss = criterion(z, z_n, c)
+        print(loss.item())
         loss_values.append(loss.item())
         loss.backward()
         optimizer.step()
-        print(loss.item())
 
     plt.plot(loss_values)
     plt.show()
