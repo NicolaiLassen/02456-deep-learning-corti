@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchaudio
 
 
 def buffered_arange(max):
@@ -203,35 +202,3 @@ class Wav2VecPrediction(nn.Module):
         z_n = self.sample_negatives(z)
 
         return z, z_n, c
-
-
-class ZeroPad1d(nn.Module):
-    def __init__(self, pad_left, pad_right):
-        super().__init__()
-        self.pad_left = pad_left
-        self.pad_right = pad_right
-
-    def forward(self, x):
-        return F.pad(x, (self.pad_left, self.pad_right))
-
-
-if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-
-
-    def plot_wav(waveform):
-        plt.figure(1)
-        plt.title("Test wave")
-        plt.plot(waveform[0])
-        plt.show()
-
-
-    waveform, sample_rate = torchaudio.load("wav_16k_example.wav")
-    # torch.unsqueeze(waveform, 1)
-    print(waveform.shape)
-    # plot_wav(waveform)
-    model = Wav2vec()
-    # For testing unsqueeze to match conv1d shape requirements
-    z, c = model(torch.unsqueeze(waveform, 1))
-    print(z)
-    # print(waveform)
