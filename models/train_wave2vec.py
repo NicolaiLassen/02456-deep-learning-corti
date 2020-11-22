@@ -1,8 +1,10 @@
 import argparse
 
+import matplotlib.pyplot as plt
 import torch
 import torch.optim as optim
-import utils.plot_util as plot_util
+import torchaudio
+
 from loss.Contrastive import ContrastiveLoss
 from models.wav2vec import Wav2vec
 from utils.audio_preprocessor_util import AudioPreprocessor
@@ -11,56 +13,60 @@ train_on_gpu = torch.cuda.is_available()
 
 if __name__ == '__main__':
 
-    #
+    # load waves
     preprocessor = AudioPreprocessor()
     preprocessor.load_data()
+    # TODO: use AudioPreprocessor not just torchaudio loader
+    waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
 
-    transfer_model = Wav2vec()
+    model = Wav2vec()
 
     # TODO: all from params
     parser = argparse.ArgumentParser()
 
-    # TODO: wrap in train evaluate
-
     # hyper
-    learning_rate = 0.001
-    n_epochs = 500
+    learning_rate = 0.01
+    n_epochs = 100
 
     criterion = ContrastiveLoss()
-    optimizer = optim.Adam(transfer_model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     if train_on_gpu:
-        transfer_model.cuda()
+        model.cuda()
+
+    train_loss = []
 
     # train loop for the transfer and new loss
     for epoch in range(n_epochs):
 
         # Bookkeeping of loss to plot
-        train_loss = 0.0
+        train_epoch_loss = 0.0
 
-        transfer_model.train()
+        model.train()
+
         ## TODO: setup train_loader for this data type
-        for data, target in train_loader:
+        for data in [waveform]:
 
             if train_on_gpu:
-                data, target = data.cuda(), target.cuda()
+                data, target = data.cuda()
 
             optimizer.zero_grad()
-            z, c = transfer_model(data)
-
-            loss = criterion(z, c)
+            c, z, z_n = model(torch.unsqueeze(waveform, 1))
+            loss = criterion(c, z, z_n)
             loss.backward()
-
             optimizer.step()
 
-            train_loss += loss.item() * data.size(0)
+            train_epoch_loss += loss.item() * data.size(0)
+
+        train_loss.append(train_epoch_loss)
+
+        if epoch % 100 == 0:
+            plt.plot(train_loss)
+            plt.show()
 
         # Bookkeeping of loss to plot
-        valid_loss = 0.0
-
-        transfer_model.eval()
+        # valid_loss = 0.0
+        # model.eval()
 
         # plot embed vectors
-        plot_util.TSNE_embed_context_plot()
-
-        torch.save(transfer_model.state_dict(), 'models/'.format("insert model name"))
+        # plot_util.TSNE_embed_context_plot()
