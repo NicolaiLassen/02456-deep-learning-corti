@@ -18,3 +18,7 @@ requirements.txt
 ### The Wave2Word model
 
 ![model_idea](images/model_idea.png)
+
+
+### Working with loss
+![model_idea](images/loss.png)
