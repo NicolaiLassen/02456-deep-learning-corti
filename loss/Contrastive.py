@@ -22,6 +22,7 @@ class ContrastiveLoss(torch.nn.Module):
         return - (self.log_sigmoid_probs(z, h_k) + self.log_sigmoid_probs(-z_n, h_k))
 
 
+# Test loss
 if __name__ == '__main__':
     criterion = ContrastiveLoss()
     model = Wav2vec()
@@ -29,7 +30,6 @@ if __name__ == '__main__':
     waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
 
     loss_values = []
-
     model.train()
     for i in range(1000):
         optimizer.zero_grad()
