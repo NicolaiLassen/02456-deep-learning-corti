@@ -60,14 +60,19 @@ class Wav2vec(nn.Module):
 
         channels = c.shape[1]
         length = c.shape[2]
-        prediction_steps = c.shape[3]
+
+        # sum_k=1^K
+        k_start = 1
+        prediction_steps = c.shape[3] - k_start
+
         prediction_buffer = torch.zeros(channels * length * prediction_steps)
         target_buffer = torch.zeros(channels * length * prediction_steps)
         target_n_buffer = torch.zeros(channels * length * prediction_steps)
 
         # sum_k=1^K
-        # TODO clean this method to be more optim!
-        for i in range(1, prediction_steps):
+        # TODO clean this method to be more optim! Verbose starting point
+        # We only need this for the Z
+        for i in range(k_start, prediction_steps):
             prediction_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(
                 input=c[..., :, :, i])
 

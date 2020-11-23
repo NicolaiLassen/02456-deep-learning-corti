@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     # hyper
     n_epochs_before_save = 100
-    n_epochs = 100
+    n_epochs = 200
     n_batches = 256
     learning_rate = 0.01
 
