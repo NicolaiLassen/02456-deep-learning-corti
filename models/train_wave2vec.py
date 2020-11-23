@@ -12,6 +12,12 @@ train_on_gpu = torch.cuda.is_available()
 
 if __name__ == '__main__':
 
+    # hyper
+    n_epochs_before_save = 100
+    n_epochs = 100
+    n_batches = 256
+    learning_rate = 0.01
+
     # load waves
     # preprocessor = AudioPreprocessor()
     # preprocessor.load_data()
@@ -22,11 +28,6 @@ if __name__ == '__main__':
 
     # TODO: all from params
     parser = argparse.ArgumentParser()
-
-    # hyper
-    n_epochs_before_save = 100
-    n_epochs = 100
-    learning_rate = 0.01
 
     criterion = ContrastiveLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)

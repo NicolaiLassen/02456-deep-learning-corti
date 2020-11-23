@@ -21,17 +21,35 @@ def log_compression(x):
 
 class Wav2vec(nn.Module):
 
-    def __init__(self):
+    def __init__(self,
+                 channels=512,
+                 activation=nn.ReLU(),
+                 dropout=0.1
+                 ):
         super(Wav2vec, self).__init__()
         # 1 input image channel, 6 output channels, 3x3 square convolution
         # kernel
+        encoder_layers = [
+            (1, channels, 10, 5),
+            (channels, channels, 8, 4),
+            (channels, channels, 4, 2),
+            (channels, channels, 4, 2),
+            (channels, channels, 4, 2)
+        ]
 
-        channels = 512
-        activation = nn.ReLU()
-        dropout = 0.1
+        context_layers = 10
 
-        self.encoder = Encoder(channels=channels, activation=activation, dropout=dropout)
-        self.context = Context(channels=channels, kernel_size=3, activation=activation, dropout=dropout)
+        self.encoder = Encoder(channels=channels,
+                               activation=activation,
+                               dropout=dropout,
+                               layers=encoder_layers
+                               )
+        self.context = Context(channels=channels,
+                               kernel_size=3,
+                               activation=activation,
+                               dropout=dropout,
+                               layers=context_layers
+                               )
         self.prediction = Wav2VecPrediction(channels=channels)
 
     def forward(self, x):
@@ -69,7 +87,7 @@ class Wav2vec(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, channels, activation, dropout):
+    def __init__(self, channels, activation, dropout, layers):
         super(Encoder, self).__init__()
 
         def encoder_conv_block(n_in, n_out, kernel_size, stride, dropout, activation):
@@ -80,21 +98,9 @@ class Encoder(nn.Module):
                 activation
             )
 
-        # (in_dim, out_dim, kernel, stride)
-        # .
-        # .
-        # layer_n
-        self.layers = [
-            (1, channels, 10, 5),
-            (channels, channels, 8, 4),
-            (channels, channels, 4, 2),
-            (channels, channels, 4, 2),
-            (channels, channels, 4, 2)
-        ]
-
         self.conv_blocks = nn.ModuleList()
 
-        for n_in, n_out, kernel_size, stride in self.layers:
+        for n_in, n_out, kernel_size, stride in layers:
             self.conv_blocks.append(encoder_conv_block(n_in, n_out, kernel_size, stride, dropout, activation))
 
         self.encoder = nn.Sequential(*self.conv_blocks)
@@ -106,10 +112,9 @@ class Encoder(nn.Module):
 
 
 class Context(nn.Module):
-    def __init__(self, channels, kernel_size, dropout, activation, layers=10):
+    def __init__(self, channels, kernel_size, dropout, activation, layers):
         super(Context, self).__init__()
 
-        # All block are the same, so create using a function
         def context_conv_block(n_in, n_out, kernel_size, dropout, activation):
             return nn.Sequential(
                 nn.Conv1d(n_in, n_out, kernel_size, padding=1),
@@ -118,10 +123,8 @@ class Context(nn.Module):
                 activation
             )
 
-        # Holder for conv layers
         self.conv_blocks = nn.ModuleList()
 
-        # Create #layers number of conv-blocks
         for i in range(0, layers):
             self.conv_blocks.append(context_conv_block(channels, channels, kernel_size, dropout, activation))
 
@@ -140,6 +143,7 @@ class Wav2VecPrediction(nn.Module):
         self.n_negatives = 1
 
     # lambda_n = 1
+    # https://github.com/pytorch/fairseq/blob/master/fairseq/models/wav2vec/wav2vec.py
     def sample_negatives(self, y):
         bsz, fsz, tsz = y.shape
 
