@@ -14,7 +14,9 @@ class ContrastiveLoss(torch.nn.Module):
         # Z^T . HK
         x_t = x.transpose(0, 1)
         # Take the mean probability of x being y
-        out = torch.einsum("ijk,jik->jik", x_t, y).mean()
+        out = torch.einsum("ijk,jik->jik", x_t, y)
+        # E
+        out = torch.mean(out)
         out = torch.sigmoid(out)
         return torch.log(out)
 

@@ -55,15 +55,15 @@ class Wav2vec(nn.Module):
     def forward(self, x):
         z = self.encoder(x)
         c = self.context(z)
-        c, z, z_n = self.prediction(c, z)
+        hk, z, z_n = self.prediction(c, z)
         z_n = z_n.squeeze(0)
 
-        channels = c.shape[1]
-        length = c.shape[2]
+        channels = hk.shape[1]
+        length = hk.shape[2]
 
         # sum_k=1^K
         k_start = 1
-        prediction_steps = c.shape[3] - k_start
+        prediction_steps = hk.shape[3] - k_start
 
         prediction_buffer = torch.zeros(channels * length * prediction_steps)
         target_buffer = torch.zeros(channels * length * prediction_steps)
@@ -74,7 +74,7 @@ class Wav2vec(nn.Module):
         # We only need this for the Z
         for i in range(k_start, prediction_steps):
             prediction_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(
-                input=c[..., :, :, i])
+                input=hk[..., :, :, i])
 
             target_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(F.pad(
                 input=z[..., i + 1:],
@@ -190,5 +190,4 @@ class Wav2VecPrediction(nn.Module):
         c = self.transpose_context(c.unsqueeze(-1))
         # get distractor samples
         z_n = self.sample_negatives(z)
-
         return c, z, z_n

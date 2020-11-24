@@ -25,6 +25,7 @@ if __name__ == '__main__':
     waveform, sample_rate = torchaudio.load("../models/wav_16k_example.wav")
 
     model = Wav2vec()
+    # print(model)
 
     # TODO: all from params
     parser = argparse.ArgumentParser()
