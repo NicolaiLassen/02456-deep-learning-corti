@@ -1,24 +1,3 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-
-def buffered_arange(max):
-    if not hasattr(buffered_arange, "buf"):
-        buffered_arange.buf = torch.LongTensor()
-    if max > buffered_arange.buf.numel():
-        buffered_arange.buf.resize_(max)
-        torch.arange(max, out=buffered_arange.buf)
-    return buffered_arange.buf[:max]
-
-
-def log_compression(x):
-    # https://www.edn.com/log-1-x-compression/
-    x = x.abs()
-    x = x + 1
-    return x.log()
-
-
 class Wav2vec(nn.Module):
 
     def __init__(self,
@@ -55,41 +34,37 @@ class Wav2vec(nn.Module):
     def forward(self, x):
         z = self.encoder(x)
         c = self.context(z)
-        hk, z, z_n = self.prediction(c, z)
+        c, z, z_n = self.prediction(c, z)
         z_n = z_n.squeeze(0)
 
-        channels = hk.shape[1]
-        length = hk.shape[2]
+        batch_size = x.shape[0]
+        channels = c.shape[1]
+        length = c.shape[2]
+        prediction_steps = c.shape[3]
+        prediction_buffer = torch.zeros(batch_size, channels * length * prediction_steps)
+        target_buffer = torch.zeros(batch_size, channels * length * prediction_steps)
+        target_n_buffer = torch.zeros(batch_size, channels * length * prediction_steps)
 
         # sum_k=1^K
-        k_start = 1
-        prediction_steps = hk.shape[3] - k_start
+        # TODO clean this method to be more optim!
+        for b in range(batch_size):
+            for i in range(1, prediction_steps):
+                prediction_buffer[b, (length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(
+                    input=c[..., :, :, i])
 
-        prediction_buffer = torch.zeros(channels * length * prediction_steps)
-        target_buffer = torch.zeros(channels * length * prediction_steps)
-        target_n_buffer = torch.zeros(channels * length * prediction_steps)
+                target_buffer[b, (length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(F.pad(
+                    input=z[..., i + 1:],
+                    pad=(i + 1, 0, 0, 0), mode='constant',
+                    value=0))
 
-        # sum_k=1^K
-        # TODO clean this method to be more optim! Verbose starting point
-        # We only need this for the Z
-        for i in range(k_start, prediction_steps):
-            prediction_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(
-                input=hk[..., :, :, i])
+                target_n_buffer[b, (length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(F.pad(
+                    input=z_n[..., i + 1:],
+                    pad=(i + 1, 0, 0, 0), mode='constant',
+                    value=0))
 
-            target_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(F.pad(
-                input=z[..., i + 1:],
-                pad=(i + 1, 0, 0, 0), mode='constant',
-                value=0))
-
-            target_n_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(F.pad(
-                input=z_n[..., i + 1:],
-                pad=(i + 1, 0, 0, 0), mode='constant',
-                value=0))
-
-        return prediction_buffer.view(channels, length, prediction_steps), \
-               target_buffer.view(channels, length, prediction_steps), \
-               target_n_buffer.view(channels, length, prediction_steps)
-
+        return prediction_buffer.view(batch_size, channels, length, prediction_steps), \
+               target_buffer.view(batch_size, channels, length, prediction_steps), \
+               target_n_buffer.view(batch_size, channels, length, prediction_steps)
 
 class Encoder(nn.Module):
     def __init__(self, channels, activation, dropout, layers):
@@ -106,13 +81,14 @@ class Encoder(nn.Module):
         self.conv_blocks = nn.ModuleList()
 
         for n_in, n_out, kernel_size, stride in layers:
-            self.conv_blocks.append(encoder_conv_block(n_in, n_out, kernel_size, stride, dropout, activation))
+          self.conv_blocks.append(encoder_conv_block(n_in, n_out, kernel_size, stride, dropout, activation))
 
         self.encoder = nn.Sequential(*self.conv_blocks)
 
     def forward(self, x):
         x = self.encoder(x)
         x = log_compression(x)
+        print(x.shape)
         return x
 
 
@@ -138,7 +114,6 @@ class Context(nn.Module):
     def forward(self, z):
         c = self.context(z)
         return c
-
 
 class Wav2VecPrediction(nn.Module):
     def __init__(self, channels, prediction_steps=12):
@@ -190,4 +165,5 @@ class Wav2VecPrediction(nn.Module):
         c = self.transpose_context(c.unsqueeze(-1))
         # get distractor samples
         z_n = self.sample_negatives(z)
+
         return c, z, z_n
