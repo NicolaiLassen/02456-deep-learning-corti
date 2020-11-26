@@ -63,6 +63,7 @@ class Wav2vecSemantic(nn.Module):
         self.fc_1 = nn.Linear(in_features=256 * 2, out_features=256)
 
     def embed_shape_transformer(self, y, idx_n):
+        ## TODO: THIS SHOULD TAKE A BATCH N SIZE
         s_c = y.contiguous().view(1, 1, -1, 256 * 2)
         s_c = F.interpolate(s_c, size=(idx_n, 256 * 2), mode='bicubic', align_corners=False)
         s_c = self.activation(s_c)
@@ -70,6 +71,7 @@ class Wav2vecSemantic(nn.Module):
         s_c = s_c.view(1, -1, 256)
         return s_c
 
+    # use_semantic is mostly for training to generate a context that fit a pretrained transformer
     def forward(self, x, idx_n=0, use_semantic=True):
         z = self.encoder(x)
         c = self.context(z)
