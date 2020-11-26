@@ -10,11 +10,19 @@ from models.wav2vec import Wav2vec
 
 train_on_gpu = torch.cuda.is_available()
 
+
+def adjust_learning_rate(start_lr, optimizer, epoch):
+    """Sets the learning rate to the initial LR decayed by 10 every 100 epochs"""
+    lr = start_lr * (0.1 ** (epoch // 100))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+
 if __name__ == '__main__':
 
     # hyper
-    n_epochs_before_save = 100
-    n_epochs = 200
+    n_epochs_before_save = 200
+    n_epochs = 1000
     n_batches = 256
     learning_rate = 0.01
 
@@ -64,7 +72,8 @@ if __name__ == '__main__':
 
         train_loss.append(train_epoch_loss)
 
-        if epoch % n_epochs_before_save == 0:
+        if epoch > 0 and epoch % n_epochs_before_save == 0:
+            adjust_learning_rate(learning_rate, optimizer, epoch)
             # TODO: plot loss here
             plt.plot(train_loss)
             plt.show()
