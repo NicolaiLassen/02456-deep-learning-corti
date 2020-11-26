@@ -2,12 +2,15 @@
 # https://github.com/google-research/electra
 # https://github.com/lucidrains/electra-pytorch/blob/master/electra_pytorch/electra_pytorch.py
 
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
 from transformers import ElectraTokenizer, ElectraModel
-import matplotlib.pyplot as plt
+
+from loss.Contrastive import ContrastiveLoss
+from loss.Dist import DistLoss
 
 
 def buffered_arange(max):
@@ -222,8 +225,11 @@ class Wav2VecPrediction(nn.Module):
 
 
 if __name__ == '__main__':
-    cos = nn.CosineSimilarity()
     wav_model = Wav2vecSemantic()
+
+    con_criterion = ContrastiveLoss()
+    dist_criterion = DistLoss()
+
     tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
     electra_model = ElectraModel.from_pretrained('google/electra-small-discriminator', return_dict=True)
 
@@ -231,7 +237,7 @@ if __name__ == '__main__':
     waveform, sample_rate = torchaudio.load("./wav_16k_example.wav")
     optimizer = torch.optim.Adam(wav_model.parameters(), lr=0.02)
 
-    loss_values = []
+    loss_dist_values = []
     wav_model.train()
     for i in range(1000):
 
@@ -239,16 +245,18 @@ if __name__ == '__main__':
         tokens = torch.tensor(tokenizer.encode(text_1, return_tensors="pt"))
         e = electra_model(tokens)[0]
 
-        (c, z, z_n), e_c = wav_model(torch.unsqueeze(waveform, 1), tokens.shape[1])
+        (hk, z, z_n), e_c = wav_model(torch.unsqueeze(waveform, 1), tokens.shape[1])
 
-        ## SIMPLE DIST LOSS
-        loss = (1 - cos(e, e_c)).sum()
-        loss_values.append(loss.item())
+        loss_dist = dist_criterion(e, e_c)
+        loss_con = con_criterion(hk, z, z_n)
+        loss = (loss_dist + loss_con) / 2
 
+        loss_dist_values.append(loss.item())
         loss.backward()
-        optimizer.step()
-        print(loss.item())
 
-        if i > 0 and i % 50 == 0:
-            plt.plot(loss_values)
+        optimizer.step()
+        print(loss_dist.item())
+
+        if i > 0 and i % 100 == 0:
+            plt.plot(loss_dist_values)
             plt.show()
