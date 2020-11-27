@@ -1,3 +1,23 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+def buffered_arange(max):
+    if not hasattr(buffered_arange, "buf"):
+        buffered_arange.buf = torch.LongTensor()
+    if max > buffered_arange.buf.numel():
+        buffered_arange.buf.resize_(max)
+        torch.arange(max, out=buffered_arange.buf)
+    return buffered_arange.buf[:max]
+
+
+def log_compression(x):
+    # https://www.edn.com/log-1-x-compression/
+    x = x.abs()
+    x = x + 1
+    return x.log()
+
 class Wav2vec(nn.Module):
 
     def __init__(self,
@@ -35,6 +55,7 @@ class Wav2vec(nn.Module):
         z = self.encoder(x)
         c = self.context(z)
         c, z, z_n = self.prediction(c, z)
+        
         z_n = z_n.squeeze(0)
 
         batch_size = x.shape[0]
@@ -50,17 +71,17 @@ class Wav2vec(nn.Module):
         for b in range(batch_size):
             for i in range(1, prediction_steps):
                 prediction_buffer[b, (length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(
-                    input=c[..., :, :, i])
+                      input=c[b, ..., :, :, i])
 
                 target_buffer[b, (length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(F.pad(
-                    input=z[..., i + 1:],
-                    pad=(i + 1, 0, 0, 0), mode='constant',
-                    value=0))
+                      input=z[b, ..., i + 1:],
+                      pad=(i + 1, 0, 0, 0), mode='constant',
+                      value=0))
 
                 target_n_buffer[b, (length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(F.pad(
-                    input=z_n[..., i + 1:],
-                    pad=(i + 1, 0, 0, 0), mode='constant',
-                    value=0))
+                      input=z_n[b, ..., i + 1:],
+                      pad=(i + 1, 0, 0, 0), mode='constant',
+                      value=0))
 
         return prediction_buffer.view(batch_size, channels, length, prediction_steps), \
                target_buffer.view(batch_size, channels, length, prediction_steps), \
@@ -81,14 +102,13 @@ class Encoder(nn.Module):
         self.conv_blocks = nn.ModuleList()
 
         for n_in, n_out, kernel_size, stride in layers:
-          self.conv_blocks.append(encoder_conv_block(n_in, n_out, kernel_size, stride, dropout, activation))
+            self.conv_blocks.append(encoder_conv_block(n_in, n_out, kernel_size, stride, dropout, activation))
 
         self.encoder = nn.Sequential(*self.conv_blocks)
 
     def forward(self, x):
         x = self.encoder(x)
         x = log_compression(x)
-        print(x.shape)
         return x
 
 

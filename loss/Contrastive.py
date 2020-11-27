@@ -13,7 +13,7 @@ class ContrastiveLoss(torch.nn.Module):
     def log_sigmoid_probs(self, x, y):
         # Z^T . HK
         x_t = x.transpose(1, 2)
-        out = torch.einsum("ijk,jik->jik", x_t, y).mean()
+        out = torch.einsum("bijk,bjik->bjik", x_t, y).mean()
         out = torch.sigmoid(out)
         return torch.log(out)
 

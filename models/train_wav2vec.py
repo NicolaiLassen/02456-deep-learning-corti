@@ -4,38 +4,51 @@ import matplotlib.pyplot as plt
 import torch
 import torch.optim as optim
 import torchaudio
+import torchaudio.datasets
+import torch.utils.data as data
 
 from loss.Contrastive import ContrastiveLoss
 from models.wav2vec import Wav2vec
 
-import torchaudio.datasets
 
-import torch.utils.data as data
+def adjust_learning_rate(start_lr, optimizer, epoch):
+    """Sets the learning rate to the initial LR decayed by 10 every 100 epochs"""
+    lr = start_lr * (0.1 ** (epoch // 100))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+        
 
+#Download LibriSpeech train/test dataset
 train_data = torchaudio.datasets.LIBRISPEECH("./", url="train-clean-100", download=True)
 test_data = torchaudio.datasets.LIBRISPEECH("./", url="test-clean", download=True)
 
+#Create collate function to pad each audio in order to have the same seq length
 def collate(batch):
     data = [torch.Tensor(t[0]).transpose(0,1) for t in batch]
-    data = torch.nn.utils.rnn.pad_sequence(data, batch_first=True)
+    data = torch.nn.utils.rnn.pad_sequence(data, batch_first=True).contiguous()
     return [data]
 
+#Create batches
+batch_size = 8
+
 train_loader = data.DataLoader(dataset=train_data,
-                                batch_size=10,
+                                batch_size=batch_size,
                                 collate_fn=collate,
                                 shuffle=True)
 
 test_loader = data.DataLoader(dataset=test_data,
-                                batch_size=10,
+                                batch_size=batch_size,
                                 collate_fn=collate,
                                 shuffle=False)
 
+#Training
 train_on_gpu = torch.cuda.is_available()
 
 if __name__ == '__main__':
 
     # hyperparameters & batches
     num_epochs = 10
+    n_epochs_before_save = 2
 
     model = Wav2vec()
     
@@ -44,22 +57,21 @@ if __name__ == '__main__':
     criterion = ContrastiveLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    #if train_on_gpu:
-    #    model.cuda()
+    if train_on_gpu:
+        model.cuda()
 
     train_loss = []
     valid_loss = []
 
     model.train()
 
-    for epoch in range(num_epochs):
-
-        data_len = len(train_loader.dataset)
-        
+    for epoch in range(num_epochs):        
         train_epoch_loss = 0.0
 
-        for batch_idx, waveform in enumerate(train_loader):
-            print(waveform[0].shape)
+        for waveform in train_loader:
+
+            if train_on_gpu:
+                waveform[0] = waveform[0].cuda()
 
             optimizer.zero_grad()
           
@@ -71,13 +83,9 @@ if __name__ == '__main__':
 
             train_epoch_loss += loss.item() * waveform[0].size(0)
 
-            train_loss.append(train_epoch_loss)
+        train_loss.append(train_epoch_loss)
 
-            if batch_idx % 10 == 0 or batch_idx == data_len:
-                print("Train Epoch %2i ({:5.2f}%) : Train Loss %f" % ( # \t Test loss: %f
-                    epoch, epoch/num_epochs*100, loss.item())) # , test_loss[-1]
-            
-        
-    plt.plot(train_loss)
-    plt.show()
-    #plt.plot(test_loss);
+        if epoch > 0 and epoch % n_epochs_before_save == 0:
+            adjust_learning_rate(learning_rate, optimizer, epoch)
+            plt.plot(train_loss)
+            plt.show()
