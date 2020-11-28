@@ -25,7 +25,7 @@ class ContrastiveLoss(torch.nn.Module):
         return - (self.log_sigmoid_probs(z, h_k) + self.log_sigmoid_probs(-z_n, h_k))
 
 
-# Test loss
+# Test criterion
 if __name__ == '__main__':
     criterion = ContrastiveLoss()
     model = Wav2vec()

@@ -5,7 +5,7 @@ import torch
 import torch.optim as optim
 import torchaudio
 
-from loss.Contrastive import ContrastiveLoss
+from criterion.Contrastive import ContrastiveLoss
 from models.wav2vec import Wav2vec
 
 train_on_gpu = torch.cuda.is_available()
@@ -46,10 +46,10 @@ if __name__ == '__main__':
 
     train_loss = []
 
-    # train loop for the transfer and new loss
+    # train loop for the transfer and new criterion
     for epoch in range(n_epochs):
 
-        # Bookkeeping of loss to plot
+        # Bookkeeping of criterion to plot
         train_epoch_loss = 0.0
 
         model.train()
@@ -74,12 +74,12 @@ if __name__ == '__main__':
 
         if epoch > 0 and epoch % n_epochs_before_save == 0:
             adjust_learning_rate(learning_rate, optimizer, epoch)
-            # TODO: plot loss here
+            # TODO: plot criterion here
             plt.plot(train_loss)
             plt.show()
 
         # TODO eval the model here:
-        # Bookkeeping of loss to plot
+        # Bookkeeping of criterion to plot
         # valid_loss = 0.0
         # model.eval()
 

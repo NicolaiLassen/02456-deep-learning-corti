@@ -130,7 +130,7 @@ class Wav2VecModel(BaseFairseqModel):
         parser.add_argument(
             "--balanced-classes",
             action="store_true",
-            help="if set, loss is scaled to balance for number of negatives",
+            help="if set, criterion is scaled to balance for number of negatives",
         )
 
         parser.add_argument(

@@ -9,8 +9,8 @@ import torch.nn.functional as F
 import torchaudio
 from transformers import ElectraTokenizer, ElectraModel
 
-from loss.Contrastive import ContrastiveLoss
-from loss.Dist import DistLoss
+from criterion.Contrastive import ContrastiveLoss
+from criterion.Dist import DistLoss
 
 
 def buffered_arange(max):
@@ -67,11 +67,16 @@ class Wav2vecSemantic(nn.Module):
 
     def embed_shape_transformer(self, y, idx_n):
         ## TODO: THIS SHOULD TAKE A BATCH N SIZE
+        print(y.shape)
         s_c = y.contiguous().view(1, 1, -1, 256 * 2)
+        print(s_c.shape)
         s_c = F.interpolate(s_c, size=(idx_n, 256 * 2), mode='bicubic', align_corners=False)
+        print(s_c.shape)
         s_c = self.activation(s_c)
         s_c = self.fc_1(s_c)
+        print(s_c.shape)
         s_c = s_c.view(1, -1, 256)
+        print(s_c.shape)
         return s_c
 
     # use_semantic is mostly for training to generate a context that fit a pretrained transformer
@@ -239,12 +244,13 @@ if __name__ == '__main__':
 
     loss_dist_values = []
     wav_model.train()
-    for i in range(1000):
+    for i in range(1):
 
         optimizer.zero_grad()
         tokens = torch.tensor(tokenizer.encode(text_1, return_tensors="pt"))
         e = electra_model(tokens)[0]
-
+        print(e.shape)
+        print(tokens.shape)
         (hk, z, z_n), e_c = wav_model(torch.unsqueeze(waveform, 1), tokens.shape[1])
 
         loss_dist = dist_criterion(e, e_c)
