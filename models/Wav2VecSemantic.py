@@ -6,8 +6,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
-from transformers import ElectraTokenizer, ElectraModel
 from torch import Tensor
+from transformers import ElectraTokenizer, ElectraModel
+
 from criterion.Contrastive import ContrastiveLoss
 from criterion.Dist import DistLoss
 from utils.plot_util import TSNE_Wav2Vec_embed_Semantic_embed
@@ -34,7 +35,8 @@ class Wav2vecSemantic(nn.Module):
     def __init__(self,
                  channels=512,
                  activation=nn.ReLU(),
-                 dropout=0.1
+                 dropout=0.1,
+                 transformer_size=256
                  ):
         super(Wav2vecSemantic, self).__init__()
         # 1 input image channel, 6 output channels, 3x3 square convolution
@@ -63,11 +65,13 @@ class Wav2vecSemantic(nn.Module):
         self.prediction = Wav2VecPrediction(channels=channels)
 
         self.activation = activation
-        self.fc_1 = nn.Linear(in_features=256 * 2, out_features=256)
+        self.fc_1 = nn.Linear(in_features=transformer_size * 2, out_features=transformer_size)
+        self.transformer_size = transformer_size
 
     def embed_shape_transformer(self, y: Tensor, idx_n: int) -> Tensor:
-        s_c = y.contiguous().view(y.shape[0], -1, 256 * 2).unsqueeze(0)
-        s_c = F.interpolate(s_c, size=(idx_n, 256 * 2), mode='bicubic', align_corners=False).squeeze(0)
+        s_c = y.contiguous().view(1, y.shape[0], -1, self.transformer_size * 2)
+        s_c = F.interpolate(s_c, size=(idx_n, self.transformer_size * 2),
+                            mode='bicubic', align_corners=False).squeeze(0)
         s_c = self.activation(s_c)
         s_c = self.fc_1(s_c)
         return s_c
@@ -81,38 +85,44 @@ class Wav2vecSemantic(nn.Module):
 
         z_n = z_n.squeeze(0)
 
+        batch = hk.shape[0]
         channels = hk.shape[1]
         length = hk.shape[2]
+        print(batch, channels, length)
 
         # sum_k=1^K
         k_start = 1
         prediction_steps = hk.shape[3] - k_start
+        pred_step_range = batch * channels * length
+        pred_ste_batch_range = pred_step_range * prediction_steps
 
-        prediction_buffer = torch.zeros(channels * length * prediction_steps)
-        target_buffer = torch.zeros(channels * length * prediction_steps)
-        target_n_buffer = torch.zeros(channels * length * prediction_steps)
+        prediction_buffer = torch.zeros(pred_ste_batch_range)
+        target_buffer = torch.zeros(pred_ste_batch_range)
+        target_n_buffer = torch.zeros(pred_ste_batch_range)
 
         # sum_k=1^K
         # TODO clean this method to be more optim! Verbose starting point
         # We only need this for the Z
+
         for i in range(k_start, prediction_steps):
-            prediction_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(
+            prediction_buffer[(pred_step_range) * i:(pred_step_range) * (i + 1)] = torch.flatten(
                 input=hk[..., :, :, i])
 
-            target_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(F.pad(
+            target_buffer[(pred_step_range) * i:(pred_step_range) * (i + 1)] = torch.flatten(F.pad(
                 input=z[..., i + 1:],
                 pad=(i + 1, 0, 0, 0), mode='constant',
                 value=0))
 
-            target_n_buffer[(length * channels) * i:(length * channels) * (i + 1)] = torch.flatten(F.pad(
+            target_n_buffer[(pred_step_range) * i:(pred_step_range) * (i + 1)] = torch.flatten(F.pad(
                 input=z_n[..., i + 1:],
                 pad=(i + 1, 0, 0, 0), mode='constant',
                 value=0))
 
-        contrastive_pred = (prediction_buffer.view(channels, length, prediction_steps),
-                            target_buffer.view(channels, length, prediction_steps),
-                            target_n_buffer.view(channels, length, prediction_steps)
-                            )
+        contrastive_pred = (
+            prediction_buffer.view(batch, channels, length, prediction_steps),
+            target_buffer.view(batch, channels, length, prediction_steps),
+            target_n_buffer.view(batch, channels, length, prediction_steps)
+        )
 
         if use_semantic and idx_n is not None:
             return contrastive_pred, self.embed_shape_transformer(c, idx_n)

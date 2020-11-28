@@ -13,9 +13,10 @@ class ContrastiveLoss(torch.nn.Module):
     # log σ(X^T . Y))
     def log_sigmoid_probs(self, x: Tensor, y: Tensor) -> Tensor:
         # Z^T . HK
-        x_t = x.transpose(0, 1)
+        x_t = x.transpose(1, 2)
         # Take the mean probability of x being y
-        out = torch.einsum("ijk,jik->jik", x_t, y)
+        # batch channel length steps
+        out = torch.einsum("blcs,bcls->blcs", x_t, y)
         # E
         out = torch.mean(out)
         out = torch.sigmoid(out)
