@@ -11,13 +11,9 @@ from criterion.Dist import DistLoss
 from torch import optim
 
 
-def train_model(wav2vec: Wav2vecSemantic, optimizer: optim, loss: ContrastiveLoss, epochs: int
-                    , training_loader: DataLoader, test_loader: DataLoader, semantic=False, **kwargs) -> (Wav2vecSemantic, List):
-
-    if semantic:
-        tokenizer = kwargs.get('electra_tokenizer')
-        electra_model = kwargs.get('electra_model')
-        loss_dist = kwargs.get('loss_dist')
+def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: ContrastiveLoss, epochs: int
+                            , training_loader: DataLoader, test_loader: DataLoader, electra_tokenizer
+                            , electra_model, loss_dist) -> (Wav2vecSemantic, List):
 
     wav_model = wav2vec
     con_criterion = loss
@@ -36,23 +32,19 @@ def train_model(wav2vec: Wav2vecSemantic, optimizer: optim, loss: ContrastiveLos
             optimizer.zero_grad()
             embed_shape = 0
 
-            if semantic:
-                encoding = tokenizer(text, return_tensors="pt", padding=True)
-                out = electra_model(**encoding).last_hidden_state
-                tokens = torch.tensor(tokenizer.encode(text, return_tensors="pt"))
-                e = electra_model(tokens)[0]
-                embed_shape = tokens.shape[1]
+            encoding = tokenizer(text, return_tensors="pt", padding=True)
+            out = electra_model(**encoding).last_hidden_state
+            tokens = torch.tensor(tokenizer.encode(text, return_tensors="pt"))
+            e = electra_model(tokens)[0]
+            embed_shape = tokens.shape[1]
 
             print(waveform.shape)
             print(out.shape)
-            (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape, use_semantic=semantic)
+            (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape)
 
             # Calculate contrastive loss / and dist if text data
             loss_con = con_criterion(hk, z, z_n)
-            loss_dist = loss_con
-            if semantic:
-                loss_dist = dist_criterion(e, e_c)
-
+            loss_dist = dist_criterion(e, e_c)
             loss = (loss_dist + loss_con) / 2
 
             losses.append(loss.item())
@@ -97,7 +89,7 @@ if __name__ == "__main__":
     electra = {'tokenizer': tokenizer, 'electra_model': electra_model, 'loss_dist': dist_criterion}
 
     train_model(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=1
-                , training_loader=train_loader, test_loader=test_loader, semantic=False, **electra)
+                , training_loader=train_loader, test_loader=test_loader, semantic=True, **electra)
 
 
 
