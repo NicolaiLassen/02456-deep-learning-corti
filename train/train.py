@@ -37,11 +37,15 @@ def train_model(wav2vec: Wav2vecSemantic, optimizer: optim, loss: ContrastiveLos
             embed_shape = 0
 
             if semantic:
+                encoding = tokenizer(text, return_tensors="pt", padding=True)
+                out = electra_model(**encoding).last_hidden_state
                 tokens = torch.tensor(tokenizer.encode(text, return_tensors="pt"))
                 e = electra_model(tokens)[0]
                 embed_shape = tokens.shape[1]
 
-            (hk, z, z_n), e_c = wav_model(y=torch.unsqueeze(waveform, 1), idx_n=embed_shape, use_semantic=semantic)
+            print(waveform.shape)
+            print(out.shape)
+            (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape, use_semantic=semantic)
 
             # Calculate contrastive loss / and dist if text data
             loss_con = con_criterion(hk, z, z_n)
