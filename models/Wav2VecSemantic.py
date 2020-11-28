@@ -65,17 +65,15 @@ class Wav2vecSemantic(nn.Module):
         self.activation = activation
         self.fc_1 = nn.Linear(in_features=256 * 2, out_features=256)
 
-    def embed_shape_transformer(self, y, idx_lengths):
+    def embed_shape_transformer(self, y, idx_n):
         s_c = y.contiguous().view(y.shape[0], -1, 256 * 2)
-        for i, idx_length in enumerate(idx_lengths):
-            s_c[i] = F.interpolate(s_c[i], size=(idx_length, 256 * 2), mode='bicubic', align_corners=False)
+        s_c = F.interpolate(s_c, size=(idx_n, 256 * 2), mode='bicubic', align_corners=False)
         s_c = self.activation(s_c)
         s_c = self.fc_1(s_c)
-        s_c = s_c.view(1, -1, 256)
         return s_c
 
     # use_semantic is mostly for training to generate a context that fit a pretrained transformer
-    def forward(self, x, idx_lengths=None, use_semantic=True):
+    def forward(self, x, idx_n=None, use_semantic=True):
         z = self.encoder(x)
         c = self.context(z)
 
@@ -116,8 +114,8 @@ class Wav2vecSemantic(nn.Module):
                             target_n_buffer.view(channels, length, prediction_steps)
                             )
 
-        if use_semantic and idx_lengths is not None:
-            return contrastive_pred, self.embed_shape_transformer(c, idx_lengths)
+        if use_semantic and idx_n is not None:
+            return contrastive_pred, self.embed_shape_transformer(c, idx_n)
 
         return contrastive_pred
 
