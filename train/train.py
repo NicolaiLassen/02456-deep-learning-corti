@@ -1,5 +1,5 @@
 from utils.training import collate
-from models.wav2vecSemantic import Wav2vecSemantic
+from models.Wav2VecSemantic import Wav2vecSemantic
 from torch.utils.data import DataLoader
 from typing import List
 import matplotlib.pyplot as plt
