@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import torch
 import torchaudio
 
-from models.wav2vec import Wav2vec
+from models.Wav2Vec import Wav2vec
 
 
 class ContrastiveLoss(torch.nn.Module):
