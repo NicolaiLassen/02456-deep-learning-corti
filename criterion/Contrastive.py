@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     loss_values = []
     model.train()
-    for i in range(1000):
+    for i in range(2):
         optimizer.zero_grad()
         c, z, z_n = model(torch.unsqueeze(waveform, 1))
         loss = criterion(c, z, z_n)
