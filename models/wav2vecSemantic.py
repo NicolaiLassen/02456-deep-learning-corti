@@ -2,7 +2,6 @@
 # https://github.com/google-research/electra
 # https://github.com/lucidrains/electra-pytorch/blob/master/electra_pytorch/electra_pytorch.py
 
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,6 +10,7 @@ from transformers import ElectraTokenizer, ElectraModel
 
 from criterion.Contrastive import ContrastiveLoss
 from criterion.Dist import DistLoss
+from utils.plot_util import TSNE_Wav2Vec_embed_Semantic_embed
 
 
 def buffered_arange(max):
@@ -244,8 +244,10 @@ if __name__ == '__main__':
 
     loss_dist_values = []
     wav_model.train()
-    for i in range(1):
 
+    pos = []
+
+    for i in range(2):
         optimizer.zero_grad()
         tokens = torch.tensor(tokenizer.encode(text_1, return_tensors="pt"))
         e = electra_model(tokens)[0]
@@ -263,6 +265,5 @@ if __name__ == '__main__':
         optimizer.step()
         print(loss_dist.item())
 
-        if i > 0 and i % 100 == 0:
-            plt.plot(loss_dist_values)
-            plt.show()
+        TSNE_Wav2Vec_embed_Semantic_embed([e_c.view(-1).cpu().detach().numpy(), e.view(-1).cpu().detach().numpy()],
+                                          batch_n=1)
