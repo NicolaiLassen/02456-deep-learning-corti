@@ -1,6 +1,8 @@
 # 02456-deep-learning-corti
 
-https://www.overleaf.com/2288993974qjrnyshhbqrf
+Synopsis Report: https://www.overleaf.com/2288993974qjrnyshhbqrf
+
+Poster: https://www.overleaf.com/2823636449wrhhsrzhfwxv
 
 https://github.com/andi611/Self-Supervised-Speech-Pretraining-and-Representation-Learning#data-preparation
 
