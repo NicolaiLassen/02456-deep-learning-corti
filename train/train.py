@@ -12,7 +12,7 @@ from torch import optim
 
 
 def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: ContrastiveLoss, epochs: int
-                            , training_loader: DataLoader, test_loader: DataLoader, electra_tokenizer
+                            , training_loader: DataLoader, test_loader: DataLoader, tokenizer
                             , electra_model, loss_dist) -> (Wav2vecSemantic, List):
 
     wav_model = wav2vec
@@ -32,14 +32,15 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
             optimizer.zero_grad()
             embed_shape = 0
 
-            encoding = tokenizer(text, return_tensors="pt", padding=True)
-            out = electra_model(**encoding).last_hidden_state
-            tokens = torch.tensor(tokenizer.encode(text, return_tensors="pt"))
-            e = electra_model(tokens)[0]
-            embed_shape = tokens.shape[1]
+            tokens = tokenizer(text, return_tensors="pt", padding=True)
+            e = electra_model(**tokens).last_hidden_state
+            # tokens = torch.tensor(tokenizer.encode(text, return_tensors="pt"))
+            # e = electra_model(tokens)[0]
+            embed_shape = e.shape[1]
 
-            print(waveform.shape)
-            print(out.shape)
+            print("Wave shape: {}".format(waveform.shape))
+            # print(e.shape)
+            print("Electra embedding shape {}".format(e.shape))
             (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape)
 
             # Calculate contrastive loss / and dist if text data
@@ -56,10 +57,10 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
             if i > 0 and i % 100 == 0:
                 plt.plot(losses)
                 plt.show()
-            break
+
     wav_model.eval()
 
-    return (wav_model, losses)
+    return wav_model, losses
 
 
 if __name__ == "__main__":
@@ -68,7 +69,7 @@ if __name__ == "__main__":
     test_data = torchaudio.datasets.LIBRISPEECH("../data/", url="test-clean", download=True)
 
     train_loader = DataLoader(dataset=train_data,
-                                   batch_size=10,
+                                   batch_size=1,
                                    collate_fn=collate,
                                    shuffle=True)
 
@@ -86,15 +87,63 @@ if __name__ == "__main__":
     dist_criterion = DistLoss()
     tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
     electra_model = ElectraModel.from_pretrained('google/electra-small-discriminator', return_dict=True)
-    electra = {'tokenizer': tokenizer, 'electra_model': electra_model, 'loss_dist': dist_criterion}
 
-    train_model(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=1
-                , training_loader=train_loader, test_loader=test_loader, semantic=True, **electra)
+    model, losses = train_model_semantic(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=1,
+                         training_loader=train_loader, test_loader=test_loader, tokenizer=tokenizer,
+                         electra_model=electra_model, loss_dist=dist_criterion)
+
+    """
+    
+    losses = []
+
+    for i in range(1):
+
+        # Enter training state
+        wav_model.train()
+        # print(next(iter(training_loader)))
+
+        for waveform, text in train_loader:
+
+            optimizer.zero_grad()
+            embed_shape = 0
+
+            tokens = tokenizer(text, return_tensors="pt", padding=True)
+            e = electra_model(**tokens).last_hidden_state
+            # tokens = torch.tensor(tokenizer.encode(text, return_tensors="pt"))
+            # e = electra_model(tokens)[0]
+            embed_shape = e.shape[1]
+
+            print("Wave shape: {}".format(waveform.shape))
+            # print(e.shape)
+            print("Electra embedding shape {}".format(e.shape))
+            (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape)
+
+            # Calculate contrastive loss / and dist if text data
+            loss_con = con_criterion(hk, z, z_n)
+            loss_dist = dist_criterion(e, e_c)
+            loss = (loss_dist + loss_con) / 2
+
+            losses.append(loss.item())
+
+            # Backprop
+            loss.backward()
+            optimizer.step()
+
+            if i > 0 and i % 100 == 0:
+                plt.plot(losses)
+                plt.show()
+            #break
+            
+*************************************************************
+    
+    train_model_semantic(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=1
+                            , training_loader=train_loader, test_loader=test_loader,
+                            tokenizer=tokenizer, electra_model=electra_model, loss_dist=con_criterion)
+
+    
 
 
 
-
-"""
     loss_dist_values = []
     wav_model.train()
     for i in range(1):
@@ -119,5 +168,8 @@ if __name__ == "__main__":
         if i > 0 and i % 100 == 0:
             plt.plot(loss_dist_values)
             plt.show()
+            
+            
+            
 """
 

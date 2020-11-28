@@ -66,8 +66,10 @@ class Wav2vecSemantic(nn.Module):
         self.fc_1 = nn.Linear(in_features=256 * 2, out_features=256)
 
     def embed_shape_transformer(self, y, idx_n):
-        s_c = y.contiguous().view(y.shape[0], -1, 256 * 2)
-        s_c = F.interpolate(s_c, size=(idx_n, 256 * 2), mode='bicubic', align_corners=False)
+        print("idx_n: {}\ny.shape: {}".format(idx_n, y.shape))
+        s_c = y.contiguous().view(y.shape[0], -1, 256 * 2).unsqueeze(0)
+        print("s_c.shape: {}".format(s_c.shape))
+        s_c = F.interpolate(s_c, size=(idx_n, 256 * 2), mode='bicubic', align_corners=False).squeeze(0)
         s_c = self.activation(s_c)
         s_c = self.fc_1(s_c)
         return s_c
