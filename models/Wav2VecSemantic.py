@@ -65,12 +65,12 @@ class Wav2vecSemantic(nn.Module):
         self.prediction = Wav2VecPrediction(channels=channels)
 
         self.activation = activation
-        self.fc_1 = nn.Linear(in_features=transformer_size * 2, out_features=transformer_size)
+        self.fc_1 = nn.Linear(in_features=transformer_size, out_features=transformer_size)
         self.transformer_size = transformer_size
 
     def embed_shape_transformer(self, y: Tensor, idx_n: int) -> Tensor:
-        s_c = y.contiguous().view(1, y.shape[0], -1, self.transformer_size * 2)
-        s_c = F.interpolate(s_c, size=(idx_n, self.transformer_size * 2),
+        s_c = y.contiguous().view(1, y.shape[0], -1, self.transformer_size)
+        s_c = F.interpolate(s_c, size=(idx_n, self.transformer_size),
                             mode='bicubic', align_corners=False).squeeze(0)
         s_c = self.activation(s_c)
         s_c = self.fc_1(s_c)
@@ -88,7 +88,6 @@ class Wav2vecSemantic(nn.Module):
         batch = hk.shape[0]
         channels = hk.shape[1]
         length = hk.shape[2]
-        print(batch, channels, length)
 
         # sum_k=1^K
         k_start = 1

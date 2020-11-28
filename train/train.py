@@ -12,11 +12,18 @@ from criterion.Dist import DistLoss
 from models.Wav2VecSemantic import Wav2vecSemantic
 from utils.training import collate
 
+# TODO: MORE GPU !!
+train_on_gpu = False  # torch.cuda.is_available()
+
 
 def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: ContrastiveLoss, epochs: int
                          , training_loader: DataLoader, test_loader: DataLoader, tokenizer
                          , electra_model, dist_criterion) -> (Wav2vecSemantic, List):
     wav_model = wav2vec
+
+    if train_on_gpu:
+        wav_model.cuda()
+
     con_criterion = loss
     optimizer = optimizer
 
@@ -30,12 +37,20 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
 
         for waveform, text in training_loader:
 
+            if train_on_gpu:
+                waveform = waveform.cuda()
+
             # Zero gradients
             optimizer.zero_grad()
 
             # Get electra embeddings
             tokens = tokenizer(text, return_tensors="pt", padding=True)
+
             e = electra_model(**tokens).last_hidden_state
+
+            if train_on_gpu:
+                e = e.cuda()
+
             embed_shape = e.shape[1]
 
             # Forward pass through architecture
@@ -54,8 +69,9 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
             optimizer.step()
 
             if i > 0 and i % 100 == 0:
+                torch.save(model.state_dict(), "./semantic_256_e_{}.ckpt".format(i))
                 plt.plot(losses)
-                plt.show()
+                plt.savefig("./semantic_256_e_{}.ckpt.png".format(i))
 
         # TODO make some train and test metrics
         # wav_model.eval()
@@ -68,17 +84,17 @@ if __name__ == "__main__":
     test_data = torchaudio.datasets.LIBRISPEECH("../data/", url="test-clean", download=True)
 
     train_loader = DataLoader(dataset=train_data,
-                              batch_size=32,
+                              batch_size=40,  # 128
                               collate_fn=collate,
                               shuffle=True)
 
     test_loader = DataLoader(dataset=test_data,
-                             batch_size=32,
+                             batch_size=40,  # 128
                              collate_fn=collate,
                              shuffle=False)
 
     # Define wav2vec model, optimizer and criterion
-    wav_model = Wav2vecSemantic()
+    wav_model = Wav2vecSemantic(channels=256)
     optimizer = torch.optim.Adam(wav_model.parameters(), lr=0.001)
     con_criterion = ContrastiveLoss()
 
@@ -90,4 +106,3 @@ if __name__ == "__main__":
     model, losses = train_model_semantic(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=1,
                                          training_loader=train_loader, test_loader=test_loader, tokenizer=tokenizer,
                                          electra_model=electra_model, dist_criterion=dist_criterion)
-
