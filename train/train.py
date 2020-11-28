@@ -29,24 +29,22 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
 
         for waveform, text in training_loader:
 
+            # Zero gradients
             optimizer.zero_grad()
-            embed_shape = 0
 
+            # Get electra embeddings
             tokens = tokenizer(text, return_tensors="pt", padding=True)
             e = electra_model(**tokens).last_hidden_state
-            # tokens = torch.tensor(tokenizer.encode(text, return_tensors="pt"))
-            # e = electra_model(tokens)[0]
             embed_shape = e.shape[1]
 
-            print("Wave shape: {}".format(waveform.shape))
-            # print(e.shape)
-            print("Electra embedding shape {}".format(e.shape))
+            # Forward pass through architecture
             (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape)
 
             # Calculate contrastive loss / and dist if text data
             loss_con = con_criterion(hk, z, z_n)
             loss_dist = dist_criterion(e, e_c)
             loss = (loss_dist + loss_con) / 2
+            print(loss)
 
             losses.append(loss.item())
 
@@ -58,7 +56,8 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
                 plt.plot(losses)
                 plt.show()
 
-    wav_model.eval()
+        # TODO make some train and test metrics
+        # wav_model.eval()
 
     return wav_model, losses
 
