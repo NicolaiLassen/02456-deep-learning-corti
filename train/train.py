@@ -1,3 +1,4 @@
+import pickle
 from typing import List
 
 import matplotlib.pyplot as plt
@@ -27,14 +28,14 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
     con_criterion = loss
     optimizer = optimizer
 
-    losses = []
-
+    epoch_mean_losses = []
     for i in range(epochs):
 
         # Enter training state
         wav_model.train()
         # print(next(iter(training_loader)))
 
+        epoch_losses = []
         for waveform, text in training_loader:
 
             if train_on_gpu:
@@ -60,23 +61,29 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
             loss_con = con_criterion(hk, z, z_n)
             loss_dist = dist_criterion(e, e_c)
             loss = (loss_dist + loss_con) / 2
-            print(loss)
 
-            losses.append(loss.item())
+            epoch_losses.append(loss.item())
 
             # Backprop
             loss.backward()
             optimizer.step()
 
-            if i > 0 and i % 100 == 0:
-                torch.save(model.state_dict(), "./semantic_256_e_{}.ckpt".format(i))
-                plt.plot(losses)
-                plt.savefig("./semantic_256_e_{}.ckpt.png".format(i))
+        with open('epoch_sub_losses_e_{}.pkl'.format(i), 'wb') as handle:
+            pickle.dump(epoch_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        torch.save(wav_model.state_dict(), "./semantic_256_e_{}.ckpt".format(i))
+        plt.plot(epoch_losses)
+        plt.savefig("./semantic_256_e_{}.ckpt.png".format(i))
+
+        epoch_mean_losses.append(torch.tensor(epoch_losses).mean().item())
+
+        with open('epoch_mean_losses_e_{}.pkl'.format(i), 'wb') as handle:
+            pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         # TODO make some train and test metrics
         # wav_model.eval()
 
-    return wav_model, losses
+    return wav_model, epoch_mean_losses
 
 
 if __name__ == "__main__":
@@ -84,12 +91,12 @@ if __name__ == "__main__":
     test_data = torchaudio.datasets.LIBRISPEECH("../data/", url="test-clean", download=True)
 
     train_loader = DataLoader(dataset=train_data,
-                              batch_size=40,  # 128
+                              batch_size=1,  # 128
                               collate_fn=collate,
                               shuffle=True)
 
     test_loader = DataLoader(dataset=test_data,
-                             batch_size=40,  # 128
+                             batch_size=1,  # 128
                              collate_fn=collate,
                              shuffle=False)
 
@@ -103,6 +110,6 @@ if __name__ == "__main__":
     tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
     electra_model = ElectraModel.from_pretrained('google/electra-small-discriminator', return_dict=True)
 
-    model, losses = train_model_semantic(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=1,
+    model, losses = train_model_semantic(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=100,
                                          training_loader=train_loader, test_loader=test_loader, tokenizer=tokenizer,
                                          electra_model=electra_model, dist_criterion=dist_criterion)
