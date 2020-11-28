@@ -8,11 +8,3 @@ def collate(batch) -> (torch.Tensor, List[str]):
     wav = torch.cat([F.interpolate(data[0].unsqueeze(0), size=(max_l)) for data in batch], dim = 0)
     text = [data[2].lower() for data in batch]
     return wav, text
-
-
-def get_tensor_batch_text(batch):
-    pass
-
-
-def get_tensor_batch_wav(batch):
-    pass

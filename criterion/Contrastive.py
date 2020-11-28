@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import torch
+from torch import Tensor
 import torchaudio
 
 from models.Wav2Vec import Wav2vec
@@ -10,7 +11,7 @@ class ContrastiveLoss(torch.nn.Module):
         super(ContrastiveLoss, self).__init__()
 
     # log σ(X^T . Y))
-    def log_sigmoid_probs(self, x, y):
+    def log_sigmoid_probs(self, x: Tensor, y: Tensor) -> Tensor:
         # Z^T . HK
         x_t = x.transpose(0, 1)
         # Take the mean probability of x being y
@@ -20,7 +21,7 @@ class ContrastiveLoss(torch.nn.Module):
         out = torch.sigmoid(out)
         return torch.log(out)
 
-    def forward(self, h_k, z, z_n):
+    def forward(self, h_k: Tensor, z: Tensor, z_n: Tensor) -> Tensor:
         # - (log σ(Z^T . HK)) + λE [log σ(ZN^T . HK)])
         return - (self.log_sigmoid_probs(z, h_k) + self.log_sigmoid_probs(-z_n, h_k))
 

@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
 from transformers import ElectraTokenizer, ElectraModel
-
+from torch import Tensor
 from criterion.Contrastive import ContrastiveLoss
 from criterion.Dist import DistLoss
 from utils.plot_util import TSNE_Wav2Vec_embed_Semantic_embed
@@ -22,7 +22,7 @@ def buffered_arange(max):
     return buffered_arange.buf[:max]
 
 
-def log_compression(x):
+def log_compression(x: Tensor) -> Tensor:
     # https://www.edn.com/log-1-x-compression/
     x = x.abs()
     x = x + 1
@@ -65,7 +65,7 @@ class Wav2vecSemantic(nn.Module):
         self.activation = activation
         self.fc_1 = nn.Linear(in_features=256 * 2, out_features=256)
 
-    def embed_shape_transformer(self, y, idx_n):
+    def embed_shape_transformer(self, y: Tensor, idx_n: int) -> Tensor:
         s_c = y.contiguous().view(y.shape[0], -1, 256 * 2).unsqueeze(0)
         s_c = F.interpolate(s_c, size=(idx_n, 256 * 2), mode='bicubic', align_corners=False).squeeze(0)
         s_c = self.activation(s_c)
@@ -178,7 +178,7 @@ class Wav2VecPrediction(nn.Module):
 
     # lambda_n = 1
     # https://github.com/pytorch/fairseq/blob/master/fairseq/models/wav2vec/wav2vec.py
-    def sample_negatives(self, y):
+    def sample_negatives(self, y: Tensor) -> Tensor:
         bsz, fsz, tsz = y.shape
 
         y = y.transpose(0, 1)  # BCT -> CBT
