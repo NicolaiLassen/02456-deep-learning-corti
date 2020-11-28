@@ -1,7 +1,7 @@
 import torch
-
+import torch.nn.functional as F
 
 def collate(batch):
-    data = [torch.Tensor(t[0]).transpose(0, 1) for t in batch]
-    data = torch.nn.utils.rnn.pad_sequence(data, batch_first=True)
-    return [data]
+    max_l = max([x[0].shape[1] for x in batch])
+    d = [(F.interpolate(data[0].unsqueeze(0), size=(max_l)).squeeze(0), data[2].lower()) for data in batch]
+    return d
