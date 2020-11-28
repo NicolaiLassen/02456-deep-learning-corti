@@ -13,7 +13,7 @@ from torch import optim
 
 def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: ContrastiveLoss, epochs: int
                             , training_loader: DataLoader, test_loader: DataLoader, tokenizer
-                            , electra_model, loss_dist) -> (Wav2vecSemantic, List):
+                            , electra_model, dist_criterion) -> (Wav2vecSemantic, List):
 
     wav_model = wav2vec
     con_criterion = loss
@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     model, losses = train_model_semantic(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=1,
                          training_loader=train_loader, test_loader=test_loader, tokenizer=tokenizer,
-                         electra_model=electra_model, loss_dist=dist_criterion)
+                         electra_model=electra_model, dist_criterion=dist_criterion)
 
     """
     
