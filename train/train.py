@@ -11,6 +11,7 @@ from transformers import ElectraTokenizer, ElectraModel
 from criterion.Contrastive import ContrastiveLoss
 from criterion.Dist import DistLoss
 from models.Wav2VecSemantic import Wav2vecSemantic
+from utils.plot_util import TSNE_Wav2Vec_embed_Semantic_embed
 from utils.training import collate
 
 # TODO: MORE GPU !!
@@ -29,14 +30,12 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
     optimizer = optimizer
 
     epoch_mean_losses = []
-    for i in range(epochs):
+    for epoch_i in range(epochs):
 
         # Enter training state
         wav_model.train()
-        # print(next(iter(training_loader)))
-
-        epoch_losses = []
-        for waveform, text in training_loader:
+        epoch_sub_losses = []
+        for batch_i, (waveform, text) in enumerate(training_loader):
 
             if train_on_gpu:
                 waveform = waveform.cuda()
@@ -61,23 +60,28 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
             loss_con = con_criterion(hk, z, z_n)
             loss_dist = dist_criterion(e, e_c)
             loss = (loss_dist + loss_con) / 2
+            print(loss)
 
-            epoch_losses.append(loss.item())
+            epoch_sub_losses.append(loss.item())
+
+            X = torch.stack([e_c.view(32, -1), e.view(32, -1)]).view(32 * 2, -1).detach().cpu().numpy()
+            TSNE_Wav2Vec_embed_Semantic_embed(X, batch_n=32,
+                                              file_name="./TSNE_256_e_{}_b_{}.png".format(epoch_i, batch_i))
 
             # Backprop
             loss.backward()
             optimizer.step()
 
-        with open('epoch_sub_losses_e_{}.pkl'.format(i), 'wb') as handle:
-            pickle.dump(epoch_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open('epoch_sub_losses_e_{}.pkl'.format(epoch_i), 'wb') as handle:
+            pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        torch.save(wav_model.state_dict(), "./semantic_256_e_{}.ckpt".format(i))
-        plt.plot(epoch_losses)
-        plt.savefig("./semantic_256_e_{}.ckpt.png".format(i))
+        torch.save(wav_model.state_dict(), "./semantic_256_e_{}.ckpt".format(epoch_i))
+        plt.plot(epoch_sub_losses)
+        plt.savefig("./semantic_256_e_{}.ckpt.png".format(epoch_i))
 
-        epoch_mean_losses.append(torch.tensor(epoch_losses).mean().item())
+        epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
 
-        with open('epoch_mean_losses_e_{}.pkl'.format(i), 'wb') as handle:
+        with open('epoch_mean_losses_e_{}.pkl'.format(epoch_i), 'wb') as handle:
             pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         # TODO make some train and test metrics
@@ -91,12 +95,12 @@ if __name__ == "__main__":
     test_data = torchaudio.datasets.LIBRISPEECH("../data/", url="test-clean", download=True)
 
     train_loader = DataLoader(dataset=train_data,
-                              batch_size=1,  # 128
+                              batch_size=32,  # 256
                               collate_fn=collate,
                               shuffle=True)
 
     test_loader = DataLoader(dataset=test_data,
-                             batch_size=1,  # 128
+                             batch_size=32,  # 256
                              collate_fn=collate,
                              shuffle=False)
 
@@ -110,6 +114,6 @@ if __name__ == "__main__":
     tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
     electra_model = ElectraModel.from_pretrained('google/electra-small-discriminator', return_dict=True)
 
-    model, losses = train_model_semantic(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=100,
+    model, losses = train_model_semantic(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=10,
                                          training_loader=train_loader, test_loader=test_loader, tokenizer=tokenizer,
                                          electra_model=electra_model, dist_criterion=dist_criterion)
