@@ -11,7 +11,6 @@ from transformers import ElectraTokenizer, ElectraModel
 from criterion.Contrastive import ContrastiveLoss
 from criterion.Dist import DistLoss
 from models.Wav2VecSemantic import Wav2vecSemantic
-from utils.plot_util import TSNE_Wav2Vec_embed_Semantic_embed
 from utils.training import collate
 
 # TODO: MORE GPU !!
@@ -64,23 +63,25 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
 
             epoch_sub_losses.append(loss.item())
 
-            X = torch.stack([e_c.view(32, -1), e.view(32, -1)]).view(32 * 2, -1).detach().cpu().numpy()
-            TSNE_Wav2Vec_embed_Semantic_embed(X, batch_n=32,
-                                              file_name="./TSNE_256_e_{}_b_{}.png".format(epoch_i, batch_i))
+            # Plot embed dist
+            # X = torch.stack([e_c.view(32, -1), e.view(32, -1)]).view(32 * 2, -1).detach().cpu().numpy()
+            # TSNE_Wav2Vec_embed_Semantic_embed(X, batch_n=32,
+            #                                   file_name="./TSNE_256_e_{}_b_{}.png".format(epoch_i, batch_i))
 
             # Backprop
             loss.backward()
             optimizer.step()
 
-        with open('epoch_sub_losses_e_{}.pkl'.format(epoch_i), 'wb') as handle:
-            pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            if batch_i % 50 == 0:
+                with open('./losses_batch/epoch_batch_losses_e_{}_b_{}.pkl'.format(epoch_i, batch_i), 'wb') as handle:
+                    pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        torch.save(wav_model.state_dict(), "./semantic_256_e_{}.ckpt".format(epoch_i))
-        plt.plot(epoch_sub_losses)
-        plt.savefig("./semantic_256_e_{}.ckpt.png".format(epoch_i))
+                torch.save(wav_model.state_dict(), "./ckpt/semantic_256_e_{}_b_{}.ckpt".format(epoch_i, batch_i))
+                plt.plot(epoch_sub_losses)
+                plt.savefig("./losses_batch_plot/wav2vec_semantic_256_e_{}_b_{}.png".format(epoch_i, batch_i))
 
+        torch.save(wav_model.state_dict(), "./ckpt/wav2vec_semantic_256_e_{}.ckpt".format(epoch_i))
         epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
-
         with open('epoch_mean_losses_e_{}.pkl'.format(epoch_i), 'wb') as handle:
             pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
