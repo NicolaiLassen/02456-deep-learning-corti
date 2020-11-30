@@ -11,7 +11,7 @@ from criterion.Contrastive import ContrastiveLoss
 from models.Wav2VecSemantic import Wav2vecSemantic
 from utils.training import collate
 
-# TODO: MORE GPU !!
+# Use GPU
 train_on_gpu = torch.cuda.is_available()
 
 
@@ -41,7 +41,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
             # Zero gradients
             optimizer.zero_grad()
 
-            # Get electra embeddings n
+            # Get electra embeddings as context
             # get random negative
             (_, text_n) = next(iter(training_loader))
             tokens = tokenizer([*text_p, *text_n], return_tensors="pt", padding=True)
@@ -62,15 +62,6 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
             # print(loss)
 
             epoch_sub_losses.append(loss.item())
-
-            # Plot embed dist
-            # X = torch.stack([
-            #     e_c.view(batch_size, -1),
-            #     e[:batch_size].view(batch_size, -1),
-            #     e[batch_size:batch_size * 2].view(batch_size, -1)
-            # ]).view(batch_size * 3, -1).detach().cpu().numpy()
-            #
-            # TSNE_Wav2Vec_embed_Semantic_embed(X, batch_n=batch_size)
 
             # Backprop
             loss.backward()

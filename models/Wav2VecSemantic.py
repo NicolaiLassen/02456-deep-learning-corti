@@ -68,7 +68,7 @@ class Wav2vecSemantic(nn.Module):
         self.fc_1 = nn.Linear(in_features=transformer_size, out_features=transformer_size)
         self.transformer_size = transformer_size
 
-    def downsample(self, y: Tensor, idx_n: int) -> Tensor:
+    def downsample_to_transformer(self, y: Tensor, idx_n: int) -> Tensor:
         s_c = y.contiguous().view(1, y.shape[0], -1, self.transformer_size)
         s_c = F.interpolate(s_c, size=(idx_n, self.transformer_size),
                             mode='bicubic', align_corners=False).squeeze(0)
@@ -102,7 +102,6 @@ class Wav2vecSemantic(nn.Module):
         # sum_k=1^K
         # TODO clean this method to be more optim! Verbose starting point
         # We only need this for the Z
-
         for i in range(k_start, prediction_steps):
             prediction_buffer[(pred_step_range) * i:(pred_step_range) * (i + 1)] = torch.flatten(
                 input=hk[..., :, :, i])
@@ -124,7 +123,7 @@ class Wav2vecSemantic(nn.Module):
         )
 
         if use_semantic and idx_n is not None:
-            return contrastive_pred, self.downsample(c, idx_n)
+            return contrastive_pred, self.downsample_to_transformer(c, idx_n)
 
         return contrastive_pred
 
