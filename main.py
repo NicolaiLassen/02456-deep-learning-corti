@@ -77,13 +77,14 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
             optimizer.step()
 
             if batch_i % 50 == 0:
-                with open('./losses_batch/epoch_batch_losses_e_{}_b_{}.pkl'.format(epoch_i, batch_i), 'wb') as handle:
+                with open('./ckpt/losses_batch/epoch_batch_losses_e_{}_b_{}.pkl'.format(epoch_i, batch_i),
+                          'wb') as handle:
                     pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
-                torch.save(wav_model.state_dict(), "./ckpt/semantic_256_e_{}_b_{}.ckpt".format(epoch_i, batch_i))
+                torch.save(wav_model.state_dict(), "./ckpt/model/semantic_256_e_{}_b_{}.ckpt".format(epoch_i, batch_i))
 
-        torch.save(wav_model.state_dict(), "./ckpt/wav2vec_semantic_256_e_{}.ckpt".format(epoch_i))
+        torch.save(wav_model.state_dict(), "./ckpt/model/wav2vec_semantic_256_e_{}.ckpt".format(epoch_i))
         epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
-        with open('epoch_mean_losses_e_{}.pkl'.format(epoch_i), 'wb') as handle:
+        with open('./ckpt/losses_epoch/epoch_mean_losses_e_{}.pkl'.format(epoch_i), 'wb') as handle:
             pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         # TODO make some train and test metrics
