@@ -9,11 +9,10 @@ from transformers import ElectraTokenizer, ElectraModel
 
 from criterion.Contrastive import ContrastiveLoss
 from models.Wav2VecSemantic import Wav2vecSemantic
-from utils.plot_util import TSNE_Wav2Vec_embed_Semantic_embed
 from utils.training import collate
 
 # TODO: MORE GPU !!
-train_on_gpu = False  # torch.cuda.is_available()
+train_on_gpu = torch.cuda.is_available()
 
 
 def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
@@ -60,18 +59,18 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
             loss_con = con_criterion(hk, z, z_n)
             loss_margin = triplet_criterion(e_c, e[:batch_size], e[batch_size:batch_size * 2])
             loss = (loss_margin + loss_con) / 2
-            print(loss)
+            # print(loss)
 
             epoch_sub_losses.append(loss.item())
 
             # Plot embed dist
-            X = torch.stack([
-                e_c.view(batch_size, -1),
-                e[:batch_size].view(batch_size, -1),
-                e[batch_size:batch_size * 2].view(batch_size, -1)
-            ]).view(batch_size * 3, -1).detach().cpu().numpy()
-
-            TSNE_Wav2Vec_embed_Semantic_embed(X, batch_n=batch_size)
+            # X = torch.stack([
+            #     e_c.view(batch_size, -1),
+            #     e[:batch_size].view(batch_size, -1),
+            #     e[batch_size:batch_size * 2].view(batch_size, -1)
+            # ]).view(batch_size * 3, -1).detach().cpu().numpy()
+            #
+            # TSNE_Wav2Vec_embed_Semantic_embed(X, batch_n=batch_size)
 
             # Backprop
             loss.backward()
