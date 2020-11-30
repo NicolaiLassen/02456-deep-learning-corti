@@ -68,7 +68,7 @@ class Wav2vecSemantic(nn.Module):
         self.fc_1 = nn.Linear(in_features=transformer_size, out_features=transformer_size)
         self.transformer_size = transformer_size
 
-    def embed_shape_transformer(self, y: Tensor, idx_n: int) -> Tensor:
+    def downsample(self, y: Tensor, idx_n: int) -> Tensor:
         s_c = y.contiguous().view(1, y.shape[0], -1, self.transformer_size)
         s_c = F.interpolate(s_c, size=(idx_n, self.transformer_size),
                             mode='bicubic', align_corners=False).squeeze(0)
@@ -124,7 +124,7 @@ class Wav2vecSemantic(nn.Module):
         )
 
         if use_semantic and idx_n is not None:
-            return contrastive_pred, self.embed_shape_transformer(c, idx_n)
+            return contrastive_pred, self.downsample(c, idx_n)
 
         return contrastive_pred
 
