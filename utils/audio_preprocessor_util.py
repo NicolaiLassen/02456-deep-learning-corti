@@ -5,8 +5,6 @@ import librosa
 import soundfile as sf
 from torch.utils.data.dataloader import DataLoader
 
-from audio_lib.audio_segmentation import segment_audio
-
 
 def convert_file_format(in_path, out_path):
     command = f'ffmpeg -i \"{in_path}\" {out_path}'
@@ -48,9 +46,6 @@ def preprocessing(args):
     _, file_extension = os.path.splitext(file_path)
     new_file_path = os.path.join(output_path, str(file_index) + file_extension)
     convert_to_16k(file_path, new_file_path)
-
-    ## TODO
-    segment_audio(new_file_path, output_path, max_len=12)
 
 
 class AudioPreprocessor:
