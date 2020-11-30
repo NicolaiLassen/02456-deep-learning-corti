@@ -1,7 +1,6 @@
 import pickle
 from typing import List
 
-import matplotlib.pyplot as plt
 import torch
 import torchaudio
 from torch import optim
@@ -9,7 +8,6 @@ from torch.utils.data import DataLoader
 from transformers import ElectraTokenizer, ElectraModel
 
 from criterion.Contrastive import ContrastiveLoss
-from criterion.Dist import DistLoss
 from models.Wav2VecSemantic import Wav2vecSemantic
 from utils.training import collate
 
@@ -17,18 +15,17 @@ from utils.training import collate
 train_on_gpu = False  # torch.cuda.is_available()
 
 
-def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: ContrastiveLoss, epochs: int
+def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
                          , training_loader: DataLoader, test_loader: DataLoader, tokenizer
-                         , electra_model, dist_criterion, batch_size) -> (Wav2vecSemantic, List):
+                         , electra_model, batch_size) -> (Wav2vecSemantic, List):
     wav_model = wav2vec
+    con_criterion = ContrastiveLoss()
+    margin_loss = torch.nn.TripletMarginLoss()
 
     if train_on_gpu:
         wav_model.cuda()
 
-    con_criterion = loss
     optimizer = optimizer
-
-    margin_loss = torch.nn.TripletMarginLoss()
 
     epoch_mean_losses = []
     for epoch_i in range(epochs):
@@ -78,10 +75,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
             if batch_i % 50 == 0:
                 with open('./losses_batch/epoch_batch_losses_e_{}_b_{}.pkl'.format(epoch_i, batch_i), 'wb') as handle:
                     pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
                 torch.save(wav_model.state_dict(), "./ckpt/semantic_256_e_{}_b_{}.ckpt".format(epoch_i, batch_i))
-                plt.plot(epoch_sub_losses)
-                plt.savefig("./losses_batch_plot/wav2vec_semantic_256_e_{}_b_{}.png".format(epoch_i, batch_i))
 
         torch.save(wav_model.state_dict(), "./ckpt/wav2vec_semantic_256_e_{}.ckpt".format(epoch_i))
         epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
@@ -98,7 +92,7 @@ if __name__ == "__main__":
     train_data = torchaudio.datasets.LIBRISPEECH("../data/", url="train-clean-100", download=True)
     test_data = torchaudio.datasets.LIBRISPEECH("../data/", url="test-clean", download=True)
 
-    batch_size = 2
+    batch_size = 32
     train_loader = DataLoader(dataset=train_data,
                               batch_size=batch_size,
                               collate_fn=collate,
@@ -112,14 +106,11 @@ if __name__ == "__main__":
     # Define wav2vec model, optimizer and criterion
     wav_model = Wav2vecSemantic(channels=256)
     optimizer = torch.optim.Adam(wav_model.parameters(), lr=0.001)
-    con_criterion = ContrastiveLoss()
 
     # Define electra model, loss and tokenizer
-    dist_criterion = DistLoss()
     tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
     electra_model = ElectraModel.from_pretrained('google/electra-small-discriminator', return_dict=True)
 
-    model, losses = train_model_semantic(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=10,
+    model, losses = train_model_semantic(wav2vec=wav_model, optimizer=optimizer, epochs=10,
                                          training_loader=train_loader, test_loader=test_loader, tokenizer=tokenizer,
-                                         electra_model=electra_model, dist_criterion=dist_criterion,
-                                         batch_size=batch_size)
+                                         electra_model=electra_model, batch_size=batch_size)
