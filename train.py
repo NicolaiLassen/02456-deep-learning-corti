@@ -94,7 +94,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
 
 if __name__ == "__main__":
     train_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
-    test_data = torchaudio.datasets.LIBRISPEECH(".data/", url="test-clean", download=True)
+    test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="test-clean", download=True)
 
     batch_size = 32
     train_loader = DataLoader(dataset=train_data,
