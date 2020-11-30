@@ -8,5 +8,5 @@
  #BSUB -o logs/%J.out
  #BSUB -e logs/%J.err
  pip3 install --user -r requirements.txt
- echo "Running script..."
- python3 train.py
+ echo "Traning..."
+ python3 main.py
