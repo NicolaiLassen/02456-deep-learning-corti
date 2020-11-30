@@ -19,7 +19,7 @@ train_on_gpu = False  # torch.cuda.is_available()
 
 def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: ContrastiveLoss, epochs: int
                          , training_loader: DataLoader, test_loader: DataLoader, tokenizer
-                         , electra_model, dist_criterion) -> (Wav2vecSemantic, List):
+                         , electra_model, dist_criterion, batch_size) -> (Wav2vecSemantic, List):
     wav_model = wav2vec
 
     if train_on_gpu:
@@ -28,13 +28,15 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
     con_criterion = loss
     optimizer = optimizer
 
+    margin_loss = torch.nn.TripletMarginLoss()
+
     epoch_mean_losses = []
     for epoch_i in range(epochs):
 
         # Enter training state
         wav_model.train()
         epoch_sub_losses = []
-        for batch_i, (waveform, text) in enumerate(training_loader):
+        for batch_i, (waveform, text_p) in enumerate(training_loader):
 
             if train_on_gpu:
                 waveform = waveform.cuda()
@@ -42,9 +44,10 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
             # Zero gradients
             optimizer.zero_grad()
 
-            # Get electra embeddings
-            tokens = tokenizer(text, return_tensors="pt", padding=True)
-
+            # Get electra embeddings n
+            # get random negative
+            (waveform_n, text_n) = next(iter(training_loader))
+            tokens = tokenizer([*text_p, *text_n], return_tensors="pt", padding=True)
             e = electra_model(**tokens).last_hidden_state
 
             if train_on_gpu:
@@ -57,8 +60,8 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, loss: Contr
 
             # Calculate contrastive loss / and dist if text data
             loss_con = con_criterion(hk, z, z_n)
-            loss_dist = dist_criterion(e, e_c)
-            loss = (loss_dist + loss_con) / 2
+            loss_margin = margin_loss(e_c, e[:batch_size], e[batch_size:batch_size * 2])
+            loss = (loss_margin + loss_con) / 2
             print(loss)
 
             epoch_sub_losses.append(loss.item())
@@ -95,13 +98,14 @@ if __name__ == "__main__":
     train_data = torchaudio.datasets.LIBRISPEECH("../data/", url="train-clean-100", download=True)
     test_data = torchaudio.datasets.LIBRISPEECH("../data/", url="test-clean", download=True)
 
+    batch_size = 2
     train_loader = DataLoader(dataset=train_data,
-                              batch_size=32,  # 256
+                              batch_size=batch_size,
                               collate_fn=collate,
                               shuffle=True)
 
     test_loader = DataLoader(dataset=test_data,
-                             batch_size=32,  # 256
+                             batch_size=batch_size,
                              collate_fn=collate,
                              shuffle=False)
 
@@ -117,4 +121,5 @@ if __name__ == "__main__":
 
     model, losses = train_model_semantic(wav2vec=wav_model, optimizer=optimizer, loss=con_criterion, epochs=10,
                                          training_loader=train_loader, test_loader=test_loader, tokenizer=tokenizer,
-                                         electra_model=electra_model, dist_criterion=dist_criterion)
+                                         electra_model=electra_model, dist_criterion=dist_criterion,
+                                         batch_size=batch_size)
