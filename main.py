@@ -32,8 +32,10 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
         # Enter training state
         wav_model.train()
         epoch_sub_losses = []
+        batches_n = len(train_loader)
         for batch_i, (waveform, text_p) in enumerate(training_loader):
             # if batch for some reason fails
+            print("{}/{}".format(batch_i, batches_n))
             try:
                 if train_on_gpu:
                     waveform = waveform.cuda()
@@ -70,7 +72,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
                 optimizer.step()
 
                 # if batch size is 256
-                if batch_i % 10 == 0:
+                if batch_i % 5 == 0:
                     # defrag GPU Mem
                     torch.cuda.empty_cache()
                     with open('./ckpt/losses_batch/epoch_batch_losses_e_{}_b_{}.pkl'.format(epoch_i, batch_i),
