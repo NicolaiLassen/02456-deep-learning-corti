@@ -75,7 +75,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
             torch.cuda.empty_cache()
 
             # if batch size is 256
-            if batch_i % 20 == 0:
+            if batch_i % int(batch_size / 2) == 0:
                 # defrag GPU Mem
                 with open('./ckpt/losses_batch/epoch_batch_losses_e_{}_b_{}.pkl'.format(epoch_i, batch_i),
                           'wb') as handle:
