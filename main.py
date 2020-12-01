@@ -5,6 +5,7 @@ import torch
 import torchaudio
 from torch import optim
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 from transformers import ElectraTokenizer, ElectraModel
 
 from criterion.Contrastive import ContrastiveLoss
@@ -32,7 +33,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
         # Enter training state
         wav_model.train()
         epoch_sub_losses = []
-        for batch_i, (waveform, text_p) in enumerate(training_loader):
+        for batch_i, (waveform, text_p) in enumerate(tqdm(training_loader)):
             # if batch for some reason fails
             try:
                 if train_on_gpu:
@@ -59,7 +60,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
                 loss_con = con_criterion(hk, z, z_n)
                 loss_margin = triplet_criterion(e_c, e[:batch_size], e[batch_size:batch_size * 2])
 
-                factor = 1.5
+                factor = 0.8
                 loss = loss_margin + factor * loss_con
                 # print(loss)
 
@@ -95,7 +96,7 @@ if __name__ == "__main__":
     train_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
     test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="test-clean", download=True)
 
-    batch_size = 4
+    batch_size = 128
     train_loader = DataLoader(dataset=train_data,
                               batch_size=batch_size,
                               num_workers=4,
