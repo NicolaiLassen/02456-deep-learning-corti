@@ -32,6 +32,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
         # Enter training state
         wav_model.train()
         epoch_sub_losses = []
+        print(len(training_loader))
         for batch_i, (waveform, text_p) in enumerate(training_loader):
             # if batch for some reason fails
             try:
