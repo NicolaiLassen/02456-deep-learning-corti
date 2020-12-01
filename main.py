@@ -36,52 +36,51 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
         for batch_i, (waveform, text_p) in enumerate(training_loader):
             # if batch for some reason fails
             print("b: {}/{}".format(batch_i, batches_n))
-            try:
-                if train_on_gpu:
-                    waveform = waveform.cuda()
 
-                # Zero gradients
-                optimizer.zero_grad()
+            if train_on_gpu:
+                waveform = waveform.cuda()
 
-                # Get electra embeddings as context
-                # get random negative
-                (_, text_n) = next(iter(training_loader))
-                tokens = tokenizer([*text_p, *text_n], return_tensors="pt", padding=True)
-                e = semantic_model(**tokens).last_hidden_state
+            # Zero gradients
+            optimizer.zero_grad()
 
-                if train_on_gpu:
-                    e = e.cuda()
+            # Get electra embeddings as context
+            # get random negative
+            (_, text_n) = next(iter(training_loader))
+            text_n = text_n[:len(text_p)]
+            tokens = tokenizer([*text_p, *text_n], return_tensors="pt", padding=True)
+            e = semantic_model(**tokens).last_hidden_state
 
-                embed_shape = e.shape[1]
+            if train_on_gpu:
+                e = e.cuda()
 
-                # Forward pass through architecture
-                (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape)
+            embed_shape = e.shape[1]
 
-                # Calculate contrastive loss / and triplet if text data
-                loss_con = con_criterion(hk, z, z_n)
-                loss_margin = triplet_criterion(e_c, e[:batch_size], e[batch_size:batch_size * 2])
+            # Forward pass through architecture
+            (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape)
 
-                factor = 0.8
-                loss = loss_margin + factor * loss_con
-                # print(loss)
+            # Calculate contrastive loss / and triplet if text data
+            loss_con = con_criterion(hk, z, z_n)
+            loss_margin = triplet_criterion(e_c, e[:batch_size], e[batch_size:batch_size * 2])
 
-                epoch_sub_losses.append(loss.item())
+            factor = 0.8
+            loss = loss_margin + factor * loss_con
+            # print(loss)
 
-                # Backprop
-                loss.backward()
-                optimizer.step()
+            epoch_sub_losses.append(loss.item())
 
-                # if batch size is 256
-                if batch_i % 4 == 0:
-                    # defrag GPU Mem
-                    torch.cuda.empty_cache()
-                    with open('./ckpt/losses_batch/epoch_batch_losses_e_{}_b_{}.pkl'.format(epoch_i, batch_i),
-                              'wb') as handle:
-                        pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
-                    torch.save(wav_model.state_dict(),
-                               "./ckpt/model/semantic_256_e_{}_b_{}.ckpt".format(epoch_i, batch_i))
-            except:
-                break
+            # Backprop
+            loss.backward()
+            optimizer.step()
+
+            # if batch size is 256
+            if batch_i % 4 == 0:
+                # defrag GPU Mem
+                torch.cuda.empty_cache()
+                with open('./ckpt/losses_batch/epoch_batch_losses_e_{}_b_{}.pkl'.format(epoch_i, batch_i),
+                          'wb') as handle:
+                    pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                torch.save(wav_model.state_dict(),
+                           "./ckpt/model/semantic_256_e_{}_b_{}.ckpt".format(epoch_i, batch_i))
 
         print("e: {}/{}".format(epoch_i, epochs))
         torch.save(wav_model.state_dict(), "./ckpt/model/wav2vec_semantic_256_e_{}.ckpt".format(epoch_i))
