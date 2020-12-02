@@ -35,7 +35,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
         batches_n = len(train_loader)
         for batch_i, (waveform, text_p) in enumerate(training_loader):
             # Mostly for the last batch
-            batch_length = len(text_p)
+            # batch_length = len(text_p)
 
             if train_on_gpu:
                 waveform = waveform.cuda()
@@ -45,25 +45,28 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
 
             # Get electra embeddings as context
             # get random negative
-            (_, text_n) = next(iter(training_loader))
-            text_n = text_n[:batch_length]
+            # (_, text_n) = next(iter(training_loader))
+            # text_n = text_n[:batch_length]
 
-            tokens = tokenizer([*text_p, *text_n], return_tensors="pt", padding=True)
-            e = semantic_model(**tokens).last_hidden_state
+            # tokens = tokenizer([*text_p, *text_n], return_tensors="pt", padding=True)
+            # e = semantic_model(**tokens).last_hidden_state
 
-            if train_on_gpu:
-                e = e.cuda()
+            # if train_on_gpu:
+            #    e = e.cuda()
 
             # Forward pass through architecture
-            embed_shape = e.shape[1]
-            (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape)
+            # embed_shape = e.shape[1]
+            (hk, z, z_n) = wav_model(x=waveform)
+            # (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape)
 
             # Calculate contrastive loss / and triplet if text data
-            loss_con = con_criterion(hk, z, z_n)
-            loss_margin = triplet_criterion(e_c, e[:batch_length], e[batch_length:batch_length * 2])
+            loss = con_criterion(hk, z, z_n)
+            # loss_con = con_criterion(hk, z, z_n)
 
-            factor = 0.8
-            loss = loss_margin + factor * loss_con
+            # loss_margin = triplet_criterion(e_c, e[:batch_length], e[batch_length:batch_length * 2])
+
+            # factor = 0.8
+            # loss = loss_margin + factor * loss_con
 
             epoch_sub_losses.append(loss.item())
 
