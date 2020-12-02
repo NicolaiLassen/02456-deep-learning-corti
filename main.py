@@ -66,7 +66,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
             loss_dist = dist_criterion(e_c, e)
 
             loss = (loss_con + loss_dist) / 2
-        
+
             # Backprop
             loss.backward()
             optimizer.step()
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     train_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
     test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="test-clean", download=True)
 
-    batch_size = 2  # 64
+    batch_size = 64
     train_loader = DataLoader(dataset=train_data,
                               batch_size=batch_size,
                               pin_memory=True,
