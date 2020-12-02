@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 from transformers import ElectraTokenizer, ElectraModel
 
 from criterion.Contrastive import ContrastiveLoss
+from criterion.CosineDist import CosineDistLoss
 from models.Wav2VecSemantic import Wav2vecSemantic
 from utils.training import collate
 
@@ -19,7 +20,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
                          , semantic_model, batch_size) -> (Wav2vecSemantic, List):
     wav_model = wav2vec
     con_criterion = ContrastiveLoss()
-    triplet_criterion = torch.nn.TripletMarginLoss()
+    dist_criterion = CosineDistLoss()
 
     if train_on_gpu:
         wav_model.cuda()
@@ -48,31 +49,29 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
             # (_, text_n) = next(iter(training_loader))
             # text_n = text_n[:batch_length]
 
-            # tokens = tokenizer([*text_p, *text_n], return_tensors="pt", padding=True)
-            # e = semantic_model(**tokens).last_hidden_state
+            tokens = tokenizer(text_p, return_tensors="pt", padding=True)
+            e = semantic_model(**tokens).last_hidden_state
 
-            # if train_on_gpu:
-            #    e = e.cuda()
+            if train_on_gpu:
+                e = e.cuda()
 
             # Forward pass through architecture
-            # embed_shape = e.shape[1]
-            (hk, z, z_n) = wav_model(x=waveform)
-            # (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape)
+            embed_shape = e.shape[1]
+            # (hk, z, z_n) = wav_model(x=waveform)
+            (hk, z, z_n), e_c = wav_model(x=waveform, idx_n=embed_shape)
 
             # Calculate contrastive loss / and triplet if text data
-            loss = con_criterion(hk, z, z_n)
-            # loss_con = con_criterion(hk, z, z_n)
+            # loss = con_criterion(hk, z, z_n)
+            loss_con = con_criterion(hk, z, z_n)
+            loss_dist = dist_criterion(e_c, e)
 
-            # loss_margin = triplet_criterion(e_c, e[:batch_length], e[batch_length:batch_length * 2])
-
-            # factor = 0.8
-            # loss = loss_margin + factor * loss_con
-
-            epoch_sub_losses.append(loss.item())
-
+            loss = (loss_con + loss_dist) / 2
+        
             # Backprop
             loss.backward()
             optimizer.step()
+
+            epoch_sub_losses.append(loss.item())
 
             # defrag GPU Mem
             torch.cuda.empty_cache()
@@ -99,7 +98,7 @@ if __name__ == "__main__":
     train_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
     test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="test-clean", download=True)
 
-    batch_size = 64
+    batch_size = 2  # 64
     train_loader = DataLoader(dataset=train_data,
                               batch_size=batch_size,
                               pin_memory=True,
