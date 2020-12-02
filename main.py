@@ -65,7 +65,6 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
             factor = 0.8
             loss = loss_margin + factor * loss_con
 
-
             epoch_sub_losses.append(loss.item())
 
             # Backprop
@@ -100,11 +99,13 @@ if __name__ == "__main__":
     batch_size = 128
     train_loader = DataLoader(dataset=train_data,
                               batch_size=batch_size,
+                              pin_memory=True,
                               collate_fn=collate,
                               shuffle=True)
 
     test_loader = DataLoader(dataset=test_data,
                              batch_size=batch_size,
+                             pin_memory=True,
                              collate_fn=collate,
                              shuffle=False)
 
