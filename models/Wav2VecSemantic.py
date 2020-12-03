@@ -26,11 +26,11 @@ class Wav2vecSemantic(nn.Module):
                  channels=512,
                  activation=nn.ReLU(),
                  dropout=0.1,
-                 transformer_size=256
+                 transformer_size=256,
+                 prediction_steps=12
                  ):
         super(Wav2vecSemantic, self).__init__()
-        # 1 input image channel, 6 output channels, 3x3 square convolution
-        # kernel
+
         encoder_layers = [
             (1, channels, 10, 5),
             (channels, channels, 8, 4),
@@ -50,7 +50,7 @@ class Wav2vecSemantic(nn.Module):
                                dropout=dropout,
                                layers=context_layers
                                )
-        self.prediction = Wav2VecPrediction(channels=channels)
+        self.prediction = Wav2VecPrediction(channels=channels, prediction_steps=prediction_steps)
 
         self.activation = activation
         self.fc_1 = nn.Linear(in_features=transformer_size, out_features=transformer_size)
@@ -64,56 +64,62 @@ class Wav2vecSemantic(nn.Module):
         s_c = self.fc_1(s_c)
         return s_c
 
-    # use_semantic is mostly for training to generate a context that fit a pretrained transformer
-    def forward(self, x, idx_n=None, use_semantic=True):
+    def forward(self, x, contrastive=True, idx_n=None):
         z = self.encoder(x)
         c = self.context(z)
 
-        hk, z, z_n = self.prediction(c, z)
+        # Case: train on supervised
+        if not contrastive:
+            return self.downsample_to_transformer(c, idx_n)
 
-        z_n = z_n.squeeze(0)
+        # Case: enable contrastive learnings
+        if contrastive:
+            hk, z, z_n = self.prediction(c, z)
+            z_n = z_n.squeeze(0)
+            batch = hk.shape[0]
+            channels = hk.shape[1]
+            length = hk.shape[2]
 
-        batch = hk.shape[0]
-        channels = hk.shape[1]
-        length = hk.shape[2]
+            # sum_k=1^K
+            k_start = 1
+            prediction_steps = hk.shape[3] - k_start
+            pred_step_range = batch * channels * length
+            pred_ste_batch_range = pred_step_range * prediction_steps
 
-        # sum_k=1^K
-        k_start = 1
-        prediction_steps = hk.shape[3] - k_start
-        pred_step_range = batch * channels * length
-        pred_ste_batch_range = pred_step_range * prediction_steps
+            prediction_buffer = torch.zeros(pred_ste_batch_range)
+            target_buffer = torch.zeros(pred_ste_batch_range)
+            target_n_buffer = torch.zeros(pred_ste_batch_range)
 
-        prediction_buffer = torch.zeros(pred_ste_batch_range)
-        target_buffer = torch.zeros(pred_ste_batch_range)
-        target_n_buffer = torch.zeros(pred_ste_batch_range)
+            # sum_k=1^K
+            # TODO clean this method to be more optim!
+            for i in range(k_start, prediction_steps):
+                prediction_buffer[pred_step_range * i:pred_step_range * (i + 1)] = torch.flatten(
+                    input=hk[..., :, :, i])
 
-        # sum_k=1^K
-        # TODO clean this method to be more optim! Verbose starting point
-        # We only need this for the Z
-        for i in range(k_start, prediction_steps):
-            prediction_buffer[(pred_step_range) * i:(pred_step_range) * (i + 1)] = torch.flatten(
-                input=hk[..., :, :, i])
+                target_buffer[pred_step_range * i:pred_step_range * (i + 1)] = torch.flatten(F.pad(
+                    input=z[..., i + 1:],
+                    pad=(i + 1, 0, 0, 0),
+                    mode='constant',
+                    value=0))
 
-            target_buffer[(pred_step_range) * i:(pred_step_range) * (i + 1)] = torch.flatten(F.pad(
-                input=z[..., i + 1:],
-                pad=(i + 1, 0, 0, 0), mode='constant',
-                value=0))
+                target_n_buffer[pred_step_range * i:pred_step_range * (i + 1)] = torch.flatten(F.pad(
+                    input=z_n[..., i + 1:],
+                    pad=(i + 1, 0, 0, 0),
+                    mode='constant',
+                    value=0))
 
-            target_n_buffer[(pred_step_range) * i:(pred_step_range) * (i + 1)] = torch.flatten(F.pad(
-                input=z_n[..., i + 1:],
-                pad=(i + 1, 0, 0, 0), mode='constant',
-                value=0))
+            contrastive_pred = (
+                prediction_buffer.view(batch, channels, length, prediction_steps),
+                target_buffer.view(batch, channels, length, prediction_steps),
+                target_n_buffer.view(batch, channels, length, prediction_steps)
+            )
 
-        contrastive_pred = (
-            prediction_buffer.view(batch, channels, length, prediction_steps),
-            target_buffer.view(batch, channels, length, prediction_steps),
-            target_n_buffer.view(batch, channels, length, prediction_steps)
-        )
+            # Case: train on mixed contrastive and supervised
+            if idx_n is not None:
+                return contrastive_pred, self.downsample_to_transformer(c, idx_n)  # , z, c
 
-        if use_semantic and idx_n is not None:
-            return contrastive_pred, self.downsample_to_transformer(c, idx_n) #, z, c
-
-        return contrastive_pred #, z, c
+            # Case: train on contrastive
+            return contrastive_pred  # , z, c
 
 
 class Encoder(nn.Module):
@@ -147,6 +153,7 @@ class Context(nn.Module):
         self.activation = activation
         self.dropout = nn.Dropout(p=dropout)
 
+        # TODO: Make block
         # Layer 1
         self.c1 = nn.Conv1d(channels, channels, kernel_size, padding=1)
         self.norm1 = nn.GroupNorm(1, channels, affine=True)
@@ -223,8 +230,6 @@ class Context(nn.Module):
         """
 
 
-
-
 class Wav2VecPrediction(nn.Module):
     def __init__(self, channels, prediction_steps=12):
         super(Wav2VecPrediction, self).__init__()
@@ -275,5 +280,4 @@ class Wav2VecPrediction(nn.Module):
         c = self.transpose_context(c.unsqueeze(-1))
         # get distractor samples
         z_n = self.sample_negatives(z)
-
         return c, z, z_n
