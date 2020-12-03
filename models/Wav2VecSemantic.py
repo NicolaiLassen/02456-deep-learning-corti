@@ -113,9 +113,9 @@ class Wav2vecSemantic(nn.Module):
         )
 
         if use_semantic and idx_n is not None:
-            return contrastive_pred, self.downsample_to_transformer(c, idx_n)
+            return contrastive_pred, self.downsample_to_transformer(c, idx_n), z, c
 
-        return contrastive_pred
+        return contrastive_pred, z, c
 
 
 class Encoder(nn.Module):
