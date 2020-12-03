@@ -76,8 +76,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
 
             # defrag GPU Mem
             torch.cuda.empty_cache()
-    return wav_model, epoch_mean_losses
-"""
+
             if batch_i % int(batches_n / 2) == 0:
                 with open('./ckpt/losses_batch/epoch_batch_losses_e_{}_b_{}.pkl'.format(epoch_i, batch_i),
                           'wb') as handle:
@@ -92,9 +91,8 @@ def train_model_semantic(wav2vec: Wav2vecSemantic, optimizer: optim, epochs: int
 
         # TODO make some train and test metrics
         # wav_model.eval()
-"""
 
-
+    return wav_model, epoch_mean_losses
 
 if __name__ == "__main__":
     train_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
