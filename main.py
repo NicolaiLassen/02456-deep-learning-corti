@@ -72,7 +72,9 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
                 batch_length = len(text_p)
 
                 (_, text_n) = next(iter(training_loader))
+
                 text_n = text_n[:batch_length]
+                text_p = text_p[:batch_length]
 
                 tokens = tokenizer([*text_p, *text_n], return_tensors="pt", padding=True)
                 e_embed = semantic_model(**tokens).last_hidden_state
@@ -84,11 +86,12 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
 
                 if args.loss is "triplet":
                     c_embed = wav_model(x=waveform, contrastive=False, idx_n=embed_shape)
-                    loss = triplet_criterion(c_embed, e_embed[:batch_size], e_embed[batch_size:batch_size * 2])
+                    loss = triplet_criterion(c_embed, e_embed[:batch_length], e_embed[batch_length:batch_length * 2])
                 else:
                     (hk, z, z_n), c_embed = wav_model(x=waveform, idx_n=embed_shape)
                     loss_con = con_criterion(hk, z, z_n)
-                    loss_triplet = triplet_criterion(c_embed, e_embed[:batch_size], e_embed[batch_size:batch_size * 2])
+                    loss_triplet = triplet_criterion(c_embed, e_embed[:batch_length],
+                                                     e_embed[batch_length:batch_length * 2])
                     loss = (loss_con + loss_triplet) / 2
 
             # Backprop
