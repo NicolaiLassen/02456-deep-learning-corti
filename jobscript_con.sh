@@ -1,6 +1,6 @@
 #!/bin/sh
  #BSUB -q gpuv100
- #BSUB -gpu "num=3"
+ #BSUB -gpu "num=1"
  #BSUB -J con
  #BSUB -n 1
  #BSUB -W 24:00
