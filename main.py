@@ -52,6 +52,9 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
 
         for waveform, text_p in training_loader:
 
+            # defrag GPU Mem
+            torch.cuda.empty_cache()
+
             if train_on_gpu:
                 waveform = waveform.cuda()
 
@@ -79,7 +82,6 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
 
                 embed_shape = e_embed.shape[1]
 
-
                 if args.loss is "triplet":
                     c_embed = wav_model(x=waveform, contrastive=False, idx_n=embed_shape)
                     loss = triplet_criterion(c_embed, e_embed[:batch_size], e_embed[batch_size:batch_size * 2])
@@ -93,10 +95,8 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
             loss.backward()
             optimizer.step()
 
+            # graph
             epoch_sub_losses.append(loss.item())
-
-            # defrag GPU Mem
-            torch.cuda.empty_cache()
 
         epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
 
@@ -131,12 +131,6 @@ if __name__ == "__main__":
                               pin_memory=True,
                               collate_fn=collate,
                               shuffle=True)
-
-    test_loader = DataLoader(dataset=test_data,
-                             batch_size=batch_size,
-                             pin_memory=True,
-                             collate_fn=collate,
-                             shuffle=False)
 
     # Define wav2vec model, optimizer and criterion
     wav_model = Wav2vecSemantic(channels=256, prediction_steps=6)
