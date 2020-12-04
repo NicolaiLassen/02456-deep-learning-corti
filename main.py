@@ -79,6 +79,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
 
                 embed_shape = e_embed.shape[1]
 
+
                 if args.loss is "triplet":
                     c_embed = wav_model(x=waveform, contrastive=False, idx_n=embed_shape)
                     loss = triplet_criterion(c_embed, e_embed[:batch_size], e_embed[batch_size:batch_size * 2])
@@ -124,7 +125,7 @@ if __name__ == "__main__":
     if args.loss not in ["con", "triplet", "con_triplet"]:
         exit(1)
 
-    batch_size = 64
+    batch_size = 32
     train_loader = DataLoader(dataset=train_data,
                               batch_size=batch_size,
                               pin_memory=True,
