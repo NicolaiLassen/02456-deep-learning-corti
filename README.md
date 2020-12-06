@@ -2,7 +2,7 @@
 
 Synopsis Report: https://www.overleaf.com/2288993974qjrnyshhbqrf
 
-Poster: https://www.overleaf.com/2823636449wrhhsrzhfwxv
+Poster:https://docs.google.com/presentation/d/1MBlMCGNFhCcRSLpeCTeVssrbzseg8gFOc0NTBz4mMCw/edit?usp=sharing
 
 https://github.com/andi611/Self-Supervised-Speech-Pretraining-and-Representation-Learning#data-preparation
 
