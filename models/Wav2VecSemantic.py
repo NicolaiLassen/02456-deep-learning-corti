@@ -69,8 +69,7 @@ class Wav2vecSemantic(nn.Module):
         c = self.context(z)
 
         # Case eval
-        print(self.eval())
-        if self.eval():
+        if not self.training:
             return z, c
 
         # Case: train on supervised
