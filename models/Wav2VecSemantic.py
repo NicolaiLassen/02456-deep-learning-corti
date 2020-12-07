@@ -68,6 +68,11 @@ class Wav2vecSemantic(nn.Module):
         z = self.encoder(x)
         c = self.context(z)
 
+        # Case eval
+        print(self.eval())
+        if self.eval():
+            return z, c
+
         # Case: train on supervised
         if not contrastive:
             return self.downsample_to_transformer(c, idx_n)
@@ -119,7 +124,7 @@ class Wav2vecSemantic(nn.Module):
                 return contrastive_pred, self.downsample_to_transformer(c, idx_n)  # , z, c
 
             # Case: train on contrastive
-            return contrastive_pred  # , z, c
+            return contrastive_pred
 
 
 class Encoder(nn.Module):
