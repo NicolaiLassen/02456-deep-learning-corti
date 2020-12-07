@@ -40,7 +40,8 @@ if __name__ == "__main__":
     loss_con_trip = []
 
     con_criterion = ContrastiveLoss()
-    for waveform, text_p in test_loader:
+    for i, (waveform, text_p) in enumerate(test_loader):
+        print(i)
 
         # defrag GPU Mem
         torch.cuda.empty_cache()
