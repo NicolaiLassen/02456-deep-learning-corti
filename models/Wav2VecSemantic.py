@@ -69,8 +69,8 @@ class Wav2vecSemantic(nn.Module):
         c = self.context(z)
 
         # Case eval
-        #if not self.training:
-        #    return z, c
+        if not self.training:
+           return z, c
 
         # Case: train on supervised
         if not contrastive:
@@ -120,7 +120,7 @@ class Wav2vecSemantic(nn.Module):
 
             # Case: train on mixed contrastive and supervised
             if idx_n is not None:
-                return contrastive_pred, self.downsample_to_transformer(c, idx_n)  # , z, c
+                return contrastive_pred, self.downsample_to_transformer(c, idx_n)
 
             # Case: train on contrastive
             return contrastive_pred

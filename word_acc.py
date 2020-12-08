@@ -3,6 +3,7 @@ import torch
 import torchaudio.models
 from torch.utils.data import DataLoader
 
+from models.Wav2LetterEmbed import Wav2LetterEmbed
 from models.Wav2VecSemantic import Wav2vecSemantic
 from utils.training import collate
 
@@ -14,25 +15,25 @@ if __name__ == "__main__":
 
     char2index = {
         " ": 0,
-        "pad": 1,
+        "-": 1,
         **{chr(i + 96): i + 1 for i in range(1, 27)}
     }
+
     index2char = {
         0: " ",
-        1: "pad",
+        1: "-",
         **{i + 1: chr(i + 96) for i in range(1, 27)}
     }
 
-    grapheme_count = 26 + 1
-    wav2letter = torchaudio.models.Wav2Letter(num_classes=grapheme_count, input_type='mfcc', num_features=256)
+    wav2letter = Wav2LetterEmbed(num_classes=len(char2index), num_features=256)
 
     wav_base = Wav2vecSemantic(channels=256, prediction_steps=6)
     wav_base.load_state_dict(
-        torch.load("./ckpt_con/model/wav2vec_semantic_con_256_e_30.ckpt", map_location=torch.device('cpu')))
+        torch.load("./ckpt_con_triplet/model/wav2vec_semantic_con_triplet_256_e_30.ckpt",
+                   map_location=torch.device('cpu')))
 
-    wav_base.eval()
     test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
-    batch_size = 4
+    batch_size = 2
     test_loader = DataLoader(dataset=test_data,
                              batch_size=batch_size,
                              pin_memory=True,
@@ -45,53 +46,64 @@ if __name__ == "__main__":
     if train_on_gpu:
         wav2letter.cuda()
 
-    epochs = 10
+    epochs = 10000
 
     ctc_loss = torch.nn.CTCLoss()
     optimizer = torch.optim.Adam(wav2letter.parameters(), lr=1e-4)
 
+    wav_base.eval()
     wav2letter.train()
+
     for epoch_i in range(epochs):
-        for i_batch, (wave, text) in enumerate(test_loader):
+        for i_batch, (wave, texts) in enumerate(test_loader):
 
             optimizer.zero_grad()
 
-            y = []
-            len_max = len(max(text, key=len))
-            for i, sentence in enumerate(text):
-                y.append([])
-                for char in sentence.lower():
-                    try:
-                        y[i].append(char2index[char])
-                    except:
-                        continue
-                y[i] += [1] * (len_max - len(y[i]))
+            with torch.no_grad():
+                y = []
+                len_max = len(max(texts, key=len))
+                for i, sentence in enumerate(texts):
+                    y.append([])
+                    for char in sentence.lower():
+                        try:
+                            y[i].append(char2index[char])
+                        except:
+                            continue
+                    y[i] += [1] * (len_max - len(y[i]))
 
-            y = torch.tensor(y)
+            y_t = torch.tensor(y)
+
             if train_on_gpu:
-                y = y.cuda()
+                y_t = y_t.cuda()
 
             if train_on_gpu:
                 wave = wave.cuda()
 
-            _, c = wav_base(wave)
+            with torch.no_grad():
+                _, c = wav_base(wave)
+
             a = wav2letter(c)
-
-            # get ready to ctc
             a_t = a.transpose(1, 2).transpose(0, 1)
-            input_lengths = torch.full(size=(a_t.size()[1],), fill_value=a_t.size()[0], dtype=torch.long)
-            target_lengths = torch.IntTensor([target.shape[0] for target in y])
 
-            loss = ctc_loss(a_t, y, input_lengths, target_lengths)
+            input_lengths = torch.full((batch_size,), a_t.size()[0], dtype=torch.long)
+            target_lengths = torch.IntTensor([target.shape[0] for target in y_t])
+
+            loss = ctc_loss(a_t, y_t, input_lengths, target_lengths)
 
             loss.backward()
+            optimizer.step()
 
-            if i_batch % 100 == 0:
-                print(i_batch)
-                print(loss)
-                a_g = a.argmax(dim=1)
-                for sentence in a_g:
-                    char_sentence = ""
-                    for index in sentence:
-                        char_sentence += index2char[index.item()]
-                    print(char_sentence)
+            # if i_batch % 100 == 0:
+            print(loss)
+            if i_batch % 400 == 0:
+                max_probs = torch.argmax(a, 1)
+                # print(loss)
+                # print(y)
+                print(max_probs)
+                for max_probs_sentence in max_probs:
+                    temp = ""
+                    for index_char in max_probs_sentence:
+                        if index_char is 0:
+                            continue
+                        temp += index2char[index_char.item()]
+                    print(temp)
