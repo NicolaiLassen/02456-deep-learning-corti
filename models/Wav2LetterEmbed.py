@@ -50,7 +50,7 @@ class Wav2LetterEmbed(nn.Module):
 
         if input_type == "waveform":
             waveform_model = nn.Sequential(
-                nn.Conv1d(in_channels=num_features, out_channels=250, kernel_size=4, stride=4, padding=2),
+                nn.Conv1d(in_channels=num_features, out_channels=250, kernel_size=160, stride=6, padding=45),
                 nn.ReLU(inplace=True)
             )
             self.acoustic_model = nn.Sequential(waveform_model, acoustic_model)
