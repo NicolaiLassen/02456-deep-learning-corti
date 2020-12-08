@@ -49,7 +49,7 @@ if __name__ == "__main__":
                    map_location=torch.device('cpu')))
 
     test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
-    batch_size = 64
+    batch_size = 32
     test_loader = DataLoader(dataset=test_data,
                              batch_size=batch_size,
                              pin_memory=True,
