@@ -1,3 +1,6 @@
+import os
+import pickle
+
 import seaborn as sns
 import torch
 import torchaudio.models
@@ -10,6 +13,12 @@ from utils.training import collate
 sns.set()
 
 train_on_gpu = torch.cuda.is_available()
+
+
+def create_dir(directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
 
 if __name__ == "__main__":
 
@@ -33,12 +42,16 @@ if __name__ == "__main__":
                    map_location=torch.device('cpu')))
 
     test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
-    batch_size = 2
+    batch_size = 8
     test_loader = DataLoader(dataset=test_data,
                              batch_size=batch_size,
                              pin_memory=True,
                              collate_fn=collate,
                              shuffle=False)
+
+    create_dir("./acc_ckpt")
+    create_dir("./acc_ckpt/losses")
+    create_dir("./acc_ckpt/model")
 
     if train_on_gpu:
         wav_base.cuda()
@@ -46,7 +59,7 @@ if __name__ == "__main__":
     if train_on_gpu:
         wav2letter.cuda()
 
-    epochs = 10000
+    epochs = 20000
 
     ctc_loss = torch.nn.CTCLoss()
     optimizer = torch.optim.Adam(wav2letter.parameters(), lr=1e-4)
@@ -54,56 +67,52 @@ if __name__ == "__main__":
     wav_base.eval()
     wav2letter.train()
 
+    wave, texts = next(iter(test_loader))
+
+    epoch_sub_losses = []
     for epoch_i in range(epochs):
-        for i_batch, (wave, texts) in enumerate(test_loader):
+        # for batch_i, (wave, texts) in enumerate(test_loader):
 
-            optimizer.zero_grad()
+        optimizer.zero_grad()
 
-            with torch.no_grad():
-                y = []
-                len_max = len(max(texts, key=len))
-                for i, sentence in enumerate(texts):
-                    y.append([])
-                    for char in sentence.lower():
-                        try:
-                            y[i].append(char2index[char])
-                        except:
-                            continue
-                    y[i] += [1] * (len_max - len(y[i]))
+        with torch.no_grad():
+            y = []
+            len_max = len(max(texts, key=len))
+            for i, sentence in enumerate(texts):
+                y.append([])
+                for char in sentence.lower():
+                    try:
+                        y[i].append(char2index[char])
+                    except:
+                        continue
+                y[i] += [1] * (len_max - len(y[i]))
 
-            y_t = torch.tensor(y)
+        y_t = torch.tensor(y)
 
-            if train_on_gpu:
-                y_t = y_t.cuda()
+        if train_on_gpu:
+            y_t = y_t.cuda()
 
-            if train_on_gpu:
-                wave = wave.cuda()
+        if train_on_gpu:
+            wave = wave.cuda()
 
-            with torch.no_grad():
-                _, c = wav_base(wave)
+        with torch.no_grad():
+            _, c = wav_base(wave)
 
-            a = wav2letter(c)
-            a_t = a.transpose(1, 2).transpose(0, 1)
+        a = wav2letter(c)
+        a_t = a.transpose(1, 2).transpose(0, 1)
 
-            input_lengths = torch.full((batch_size,), a_t.size()[0], dtype=torch.long)
-            target_lengths = torch.IntTensor([target.shape[0] for target in y_t])
+        input_lengths = torch.full((batch_size,), a_t.size()[0], dtype=torch.long)
+        target_lengths = torch.IntTensor([target.shape[0] for target in y_t])
 
-            loss = ctc_loss(a_t, y_t, input_lengths, target_lengths)
+        loss = ctc_loss(a_t, y_t, input_lengths, target_lengths)
 
-            loss.backward()
-            optimizer.step()
+        epoch_sub_losses.append(loss.item())
 
-            # if i_batch % 100 == 0:
-            print(loss)
-            if i_batch % 400 == 0:
-                max_probs = torch.argmax(a, 1)
-                # print(loss)
-                # print(y)
-                print(max_probs)
-                for max_probs_sentence in max_probs:
-                    temp = ""
-                    for index_char in max_probs_sentence:
-                        if index_char is 0:
-                            continue
-                        temp += index2char[index_char.item()]
-                    print(temp)
+        loss.backward()
+        optimizer.step()
+
+        if epoch_i % 5000 == 0:
+            with open('./acc_ckpt/losses/epoch_batch_losses_e_{}_b.pkl'.format(epoch_i),
+                      'wb') as handle:
+                pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            torch.save(wav2letter.state_dict(), "./acc_ckpt/model/wav2letter_e_{}.ckpt".format(epoch_i))
