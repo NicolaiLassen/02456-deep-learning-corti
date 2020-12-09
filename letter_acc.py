@@ -20,6 +20,7 @@ def create_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
+import kenlm
 
 if __name__ == "__main__":
 
@@ -43,6 +44,9 @@ if __name__ == "__main__":
 
     num_features = 256
     wav2letter = Wav2LetterEmbed(num_classes=len(char2index), num_features=num_features)
+    wav2letter.load_state_dict(
+        torch.load("./ckpt_acc_letter_con/model/wav2letter_e_30.ckpt",
+                   map_location=torch.device('cpu')))
 
     wav_base = Wav2vecSemantic(channels=256, prediction_steps=6)
     wav_base.load_state_dict(
@@ -57,9 +61,9 @@ if __name__ == "__main__":
                              collate_fn=collate,
                              shuffle=False)
 
-    create_dir("./ckpt_acc")
-    create_dir("./ckpt_acc/losses")
-    create_dir("./ckpt_acc/model")
+    create_dir("./ckpt_acc_wav")
+    create_dir("./ckpt_acc_wav/losses")
+    create_dir("./ckpt_acc_wav/model")
 
     if train_on_gpu:
         wav_base.cuda()
@@ -71,7 +75,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(wav2letter.parameters(), lr=1e-4)
 
     wav_base.eval()
-    wav2letter.train()
+    wav2letter.eval()
 
 
     def get_y_idxs(texts):
@@ -111,6 +115,9 @@ if __name__ == "__main__":
             input_lengths = torch.full((batch_size,), a_t.size()[0], dtype=torch.long)
             target_lengths = torch.IntTensor([target.shape[0] for target in y_t])
 
+            arg_max = torch.argmax(a, 1)
+            "".join([index2char[index.item()] for index in arg_max[0]])
+
             try:
                 loss = ctc_loss(a_t, y_t, input_lengths, target_lengths)
                 loss_item = loss.item()
@@ -124,9 +131,9 @@ if __name__ == "__main__":
                 print("error")
                 continue
 
-        with open('./ckpt_acc/losses/epoch_batch_losses_e_{}_b.pkl'.format(epoch_i),
+        with open('./ckpt_acc_wav/losses/epoch_batch_losses_e_{}_b.pkl'.format(epoch_i),
                   'wb') as handle:
             pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         if epoch_i % 10 == 0:
-            torch.save(wav2letter.state_dict(), "./ckpt_acc/model/wav2letter_e_{}.ckpt".format(epoch_i))
+            torch.save(wav2letter.state_dict(), "./ckpt_acc_wav/model/wav2letter_e_{}.ckpt".format(epoch_i))

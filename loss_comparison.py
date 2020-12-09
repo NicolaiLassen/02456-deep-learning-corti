@@ -20,8 +20,9 @@ if __name__ == "__main__":
         torch.load("./ckpt_con/model/wav2vec_semantic_con_256_e_34.ckpt", map_location=torch.device('cpu')))
     model_trip.load_state_dict(
         torch.load("./ckpt_triplet/model/wav2vec_semantic_triplet_256_e_52.ckpt", map_location=torch.device('cpu')))
-    model_con_trip.load_state_dict(torch.load("./ckpt_con_triplet/model/wav2vec_semantic_con_triplet_256_e_51.ckpt",
-                                              map_location=torch.device('cpu')))
+    model_con_trip.load_state_dict(
+        torch.load("./ckpt_con_triplet/model/wav2vec_semantic_con_triplet_256_e_51.ckpt",
+                   map_location=torch.device('cpu')))
 
     model_base.eval()
     model_trip.eval()

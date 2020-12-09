@@ -154,3 +154,5 @@ com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
 fabric.properties
+
+/ckpt_acc_letter_con/
