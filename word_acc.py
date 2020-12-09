@@ -49,7 +49,7 @@ if __name__ == "__main__":
                    map_location=torch.device('cpu')))
 
     test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
-    batch_size = 1
+    batch_size = 16
     test_loader = DataLoader(dataset=test_data,
                              batch_size=batch_size,
                              pin_memory=True,
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(wav2letter.parameters(), lr=1e-4)
 
     wav_base.eval()
-    wav2letter.eval()
+    wav2letter.train()
 
     for epoch_i in range(epochs):
         epoch_sub_losses = []
@@ -120,4 +120,6 @@ if __name__ == "__main__":
         with open('./ckpt_acc/losses/epoch_batch_losses_e_{}_b.pkl'.format(epoch_i),
                   'wb') as handle:
             pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        torch.save(wav2letter.state_dict(), "./ckpt_acc/model/wav2letter_e_{}.ckpt".format(epoch_i))
+
+        if epoch_i % 10 == 0:
+            torch.save(wav2letter.state_dict(), "./ckpt_acc/model/wav2letter_e_{}.ckpt".format(epoch_i))
