@@ -1,3 +1,4 @@
+import math
 import os
 import pickle
 
@@ -49,7 +50,7 @@ if __name__ == "__main__":
                    map_location=torch.device('cpu')))
 
     test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
-    batch_size = 1
+    batch_size = 8
     test_loader = DataLoader(dataset=test_data,
                              batch_size=batch_size,
                              pin_memory=True,
@@ -62,8 +63,6 @@ if __name__ == "__main__":
 
     if train_on_gpu:
         wav_base.cuda()
-
-    if train_on_gpu:
         wav2letter.cuda()
 
     epochs = 10000
@@ -74,6 +73,22 @@ if __name__ == "__main__":
     wav_base.eval()
     wav2letter.train()
 
+
+    def get_y_idxs(texts):
+        with torch.no_grad():
+            y = []
+            len_max = len(max(texts, key=len))
+            for i, sentence in enumerate(texts):
+                y.append([])
+                for char in sentence.lower():
+                    try:
+                        y[i].append(char2index[char])
+                    except:
+                        continue
+                y[i] += [1] * (len_max - len(y[i]))
+            return torch.tensor(y)
+
+
     for epoch_i in range(epochs):
         epoch_sub_losses = []
         for batch_i, (wave, texts) in enumerate(test_loader):
@@ -81,24 +96,10 @@ if __name__ == "__main__":
             torch.cuda.empty_cache()
             optimizer.zero_grad()
 
-            with torch.no_grad():
-                y = []
-                len_max = len(max(texts, key=len))
-                for i, sentence in enumerate(texts):
-                    y.append([])
-                    for char in sentence.lower():
-                        try:
-                            y[i].append(char2index[char])
-                        except:
-                            continue
-                    y[i] += [1] * (len_max - len(y[i]))
-
-                y_t = torch.tensor(y)
+            y_t = get_y_idxs(texts)
 
             if train_on_gpu:
                 y_t = y_t.cuda()
-
-            if train_on_gpu:
                 wave = wave.cuda()
 
             with torch.no_grad():
@@ -110,12 +111,18 @@ if __name__ == "__main__":
             input_lengths = torch.full((batch_size,), a_t.size()[0], dtype=torch.long)
             target_lengths = torch.IntTensor([target.shape[0] for target in y_t])
 
-            loss = ctc_loss(a_t, y_t, input_lengths, target_lengths)
-
-            epoch_sub_losses.append(loss.item())
-
-            loss.backward()
-            optimizer.step()
+            try:
+                loss = ctc_loss(a_t, y_t, input_lengths, target_lengths)
+                loss_item = loss.item()
+                if math.isinf(loss_item):
+                    continue
+                print(loss_item)
+                epoch_sub_losses.append(loss_item)
+                loss.backward()
+                optimizer.step()
+            except:
+                print("error")
+                continue
 
         with open('./ckpt_acc/losses/epoch_batch_losses_e_{}_b.pkl'.format(epoch_i),
                   'wb') as handle:

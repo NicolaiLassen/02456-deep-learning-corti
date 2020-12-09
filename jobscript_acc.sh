@@ -11,4 +11,4 @@
  module load python3/3.6.2
  pip3 install --user -r requirements.txt
  echo "Traning..."
- python3 word_acc.py
+ python3 letter_acc.py
