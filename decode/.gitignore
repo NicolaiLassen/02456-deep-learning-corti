@@ -1,0 +1,6 @@
+*.pyc
+*.log
+doc/notes.txt
+doc/matrix.svg
+__pycache__/
+.idea/

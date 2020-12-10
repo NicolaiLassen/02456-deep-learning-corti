@@ -1,7 +1,7 @@
-import matplotlib.pyplot as plt
 import os
 import pickle
 
+import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
