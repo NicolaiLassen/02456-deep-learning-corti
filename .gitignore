@@ -132,6 +132,7 @@ pip-selfcheck.json
 /lm
 /fairseq
 /data
+/ckpt_wav2letter
 .idea/
 /temp
 /resources

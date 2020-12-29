@@ -57,20 +57,20 @@ if __name__ == "__main__":
 
     wav_base = Wav2vecSemantic(channels=256, prediction_steps=6)
     wav_base.load_state_dict(
-        torch.load("./ckpt_con_triplet/model/wav2vec_semantic_con_triplet_256_e_51.ckpt",
+        torch.load("./ckpt_con/model/wav2vec_semantic_con_256_e_30.ckpt",
                    map_location=torch.device('cpu')))
 
     test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
-    batch_size = 1
+    batch_size = 6
     test_loader = DataLoader(dataset=test_data,
                              batch_size=batch_size,
                              pin_memory=True,
                              collate_fn=collate,
                              shuffle=False)
 
-    create_dir("./ckpt_acc_wav")
-    create_dir("./ckpt_acc_wav/losses")
-    create_dir("./ckpt_acc_wav/model")
+    create_dir("./ckpt_wav2letter")
+    create_dir("./ckpt_wav2letter/losses")
+    create_dir("./ckpt_wav2letter/model")
 
     if train_on_gpu:
         wav_base.cuda()
@@ -78,75 +78,71 @@ if __name__ == "__main__":
 
     epochs = 10000
 
-    criterion = torch.nn.CTCLoss(blank=labels.index(blank))
-    optimizer = Adam(wav2letter.parameters(), lr=1e-3)
+    criterion = torch.nn.CTCLoss(blank=labels.index(blank), zero_infinity=True)
+    optimizer = Adam(wav2letter.parameters(), lr=1e-4)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6, verbose=True)
 
     wav_base.eval()
     wav2letter.train()
 
-
-    def get_y_idxs(texts) -> Tensor:
+    def get_y_idxs(transcripts) -> Tensor:
         with torch.no_grad():
             y = []
-            len_max = len(max(texts, key=len))
-            for i, sentence in enumerate(texts):
+            len_max = len(max(transcripts, key=len))
+            for i, sentence in enumerate(transcripts):
                 y.append([])
                 for char in sentence.lower():
                     try:
                         y[i].append(char2index[char])
                     except:
                         continue
-                y[i] += [1] * (len_max - len(y[i]))
-            return torch.tensor(y)
+                # pad to longest
+                y[i] += [labels.index(blank)] * (len_max - len(y[i]))
 
+            # return int tensor
+            return torch.tensor(y, dtype=torch.int16)
 
-    # TEMP
-    wave, text = next(iter(test_loader))
-
-    print("target: {}\n".format("".join(text)))
 
     for epoch_i in range(epochs):
         epoch_sub_losses = []
-        # TODO
-        # for batch_i, (wave, texts) in enumerate(test_loader):
-        torch.cuda.empty_cache()
-        optimizer.zero_grad()
+        for batch_i, (wave, texts) in enumerate(test_loader):
+            torch.cuda.empty_cache()
+            optimizer.zero_grad()
 
-        y = get_y_idxs(text)
+            y = get_y_idxs(texts)
 
-        if train_on_gpu:
-            y = y.cuda()
-            wave = wave.cuda()
+            if train_on_gpu:
+                y = y.cuda()
+                wave = wave.cuda()
 
-        with torch.no_grad():
-            _, c = wav_base(wave)
+            with torch.no_grad():
+                _, c = wav_base(wave)
 
-        out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
+            out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
 
-        out_p = out.permute(2, 0, 1)  # <- log_probs in (input_length, batch_size, number_of_classes)
-        input_lengths = torch.full((batch_size,), fill_value=out_p.size(0), dtype=torch.int32)
-        target_lengths = torch.full((batch_size,), fill_value=y.size(1), dtype=torch.int32)
-        loss = criterion(out_p, y, input_lengths, target_lengths)
+            out_p = out.permute(2, 0, 1)  # <- log_probs in (input_length, batch_size, number_of_classes)
+            input_lengths = torch.full((batch_size,), fill_value=out_p.size(0), dtype=torch.int32)
+            target_lengths = torch.full((batch_size,), fill_value=y.size(1), dtype=torch.int32)
+            loss = criterion(out_p, y, input_lengths, target_lengths)
 
-        loss_item = loss.item()
-        print(loss_item)
-        epoch_sub_losses.append(loss_item)
+            loss_item = loss.item()
+            print(loss_item)
+            epoch_sub_losses.append(loss_item)
 
-        loss.backward()
-        optimizer.step()
+            loss.backward()
+            optimizer.step()
+            scheduler.step(loss)
 
-        print(optimizer.param_groups[0]['lr'])
-        scheduler.step(loss)
+            # TODO: MOVE TO DECODER
+            if batch_i + 1 % 100 == 0:
+                with torch.no_grad():
+                    beam_results, beam_scores, timesteps, out_lens = decoder.decode(
+                        out.permute(0, 2, 1))  # <- beam in (batch_size, input_length, number_of_classes)
+                    # First sentence
+                    print("target:", "".join(texts[0]))
+                    print("beam", "".join([index2char[n.item()] for n in beam_results[0][0][:out_lens[0][0]]]))
 
+        torch.save(wav2letter.state_dict(), "./ckpt_acc_wav/model/wav2letter_e_{}.ckpt".format(epoch_i))
         with open('./ckpt_acc_wav/losses/epoch_batch_losses_e_{}_b.pkl'.format(epoch_i),
                   'wb') as handle:
             pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-        if epoch_i % 10 == 0:
-            with torch.no_grad():
-                beam_results, beam_scores, timesteps, out_lens = decoder.decode(
-                    out.permute(0, 2, 1))  # <- beam in (batch_size, input_length, number_of_classes)
-                print("".join([index2char[n.item()] for n in beam_results[0][0][:out_lens[0][0]]]))
-
-            torch.save(wav2letter.state_dict(), "./ckpt_acc_wav/model/wav2letter_e_{}.ckpt".format(epoch_i))
