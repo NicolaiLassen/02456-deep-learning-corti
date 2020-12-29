@@ -128,7 +128,8 @@ pip-selfcheck.json
 # Mongo Explorer plugin:
 .idea/mongoSettings.xml
 
-
+/decode
+/lm
 /fairseq
 /data
 .idea/

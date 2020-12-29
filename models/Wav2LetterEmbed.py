@@ -3,6 +3,7 @@ import torch.nn.functional
 from torch.fft import Tensor
 
 
+# Reworked simple acoustic model for wav2vec embed output
 class Wav2LetterEmbed(nn.Module):
     r"""Wav2Letter model architecture from the `Wav2Letter an End-to-End ConvNet-based Speech Recognition System`_.
 

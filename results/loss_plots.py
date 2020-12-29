@@ -1,10 +1,9 @@
 import os
 import pickle
-
+import torch
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-
     PATH_con = "ckpt_con/losses_epoch"
     PATH_tri = "ckpt_triplet/losses_epoch"
     PATH_contri = "ckpt_con_triplet/losses_epoch"

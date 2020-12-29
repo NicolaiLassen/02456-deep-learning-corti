@@ -6,6 +6,7 @@ from typing import List
 import torch
 import torchaudio
 from torch import optim
+from torch.optim import Adam, lr_scheduler
 from torch.utils.data import DataLoader
 from transformers import ElectraTokenizer, ElectraModel
 
@@ -23,6 +24,7 @@ def create_dir(directory):
 
 def train_model_semantic(wav2vec: Wav2vecSemantic,
                          optimizer: optim,
+                         scheduler: lr_scheduler,
                          epochs: int,
                          args: argparse.Namespace,
                          training_loader: DataLoader,
@@ -33,6 +35,8 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
     create_dir("./ckpt_{}/losses_batch".format(args.loss))
     create_dir("./ckpt_{}/losses_epoch".format(args.loss))
     create_dir("./ckpt_{}/model".format(args.loss))
+
+    beta = 0.8
 
     wav_model = wav2vec
     con_criterion = ContrastiveLoss()
@@ -92,11 +96,12 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
                     loss_con = con_criterion(hk, z, z_n)
                     loss_triplet = triplet_criterion(c_embed, e_embed[:batch_length],
                                                      e_embed[batch_length:batch_length * 2])
-                    loss = (loss_con + loss_triplet) / 2
+                    loss = loss_con + loss_triplet * beta
 
             # Backprop
             loss.backward()
             optimizer.step()
+            scheduler.step(loss)
 
             # graph
             epoch_sub_losses.append(loss.item())
@@ -137,7 +142,8 @@ if __name__ == "__main__":
 
     # Define wav2vec model, optimizer and criterion
     wav_model = Wav2vecSemantic(channels=256, prediction_steps=6)
-    optimizer = torch.optim.Adam(wav_model.parameters(), lr=0.001)
+    optimizer = Adam(wav_model.parameters(), lr=0.001)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6, verbose=True)
 
     # Define electra model, loss and tokenizer
     tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
@@ -145,6 +151,7 @@ if __name__ == "__main__":
 
     model, losses = train_model_semantic(wav2vec=wav_model,
                                          optimizer=optimizer,
+                                         scheduler=scheduler,
                                          epochs=100,
                                          args=args,
                                          training_loader=train_loader,

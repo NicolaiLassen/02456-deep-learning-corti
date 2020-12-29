@@ -1,3 +1,0 @@
-editdistance==0.5.2
-numpy==1.16.1
-pkg-resources==0.0.0
