@@ -57,12 +57,12 @@ class Wav2vecSemantic(nn.Module):
         self.transformer_size = transformer_size
 
     def downsample_to_transformer(self, y: Tensor, idx_n: int) -> Tensor:
-        s_c = y.contiguous().view(1, y.shape[0], -1, self.transformer_size)
-        s_c = F.interpolate(s_c, size=(idx_n, self.transformer_size),
+        s_z = y.contiguous().view(1, y.shape[0], -1, self.transformer_size)
+        s_z = F.interpolate(s_z, size=(idx_n, self.transformer_size),
                             mode='bicubic', align_corners=False).squeeze(0)
-        s_c = self.activation(s_c)
-        s_c = self.fc_1(s_c)
-        return s_c
+        s_z = self.activation(s_z)
+        s_z = self.fc_1(s_z)
+        return s_z
 
     def forward(self, x, contrastive=True, idx_n=None):
         z = self.encoder(x)

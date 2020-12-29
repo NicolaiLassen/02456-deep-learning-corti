@@ -87,12 +87,12 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
                 embed_shape = e_embed.shape[1]
 
                 if args.loss is "triplet":
-                    c_embed = wav_model(x=waveform, contrastive=False, idx_n=embed_shape)
-                    loss = triplet_criterion(c_embed, e_embed[:batch_length], e_embed[batch_length:batch_length * 2])
+                    z_embed = wav_model(x=waveform, contrastive=False, idx_n=embed_shape)
+                    loss = triplet_criterion(z_embed, e_embed[:batch_length], e_embed[batch_length:batch_length * 2])
                 else:
-                    (hk, z, z_n), c_embed = wav_model(x=waveform, idx_n=embed_shape)
+                    (hk, z, z_n), z_embed = wav_model(x=waveform, idx_n=embed_shape)
                     loss_con = con_criterion(hk, z, z_n)
-                    loss_triplet = triplet_criterion(c_embed, e_embed[:batch_length],
+                    loss_triplet = triplet_criterion(z_embed, e_embed[:batch_length],
                                                      e_embed[batch_length:batch_length * 2])
                     loss = loss_con + loss_triplet * beta
 

@@ -1,3 +1,4 @@
+import argparse
 import os
 import pickle
 
@@ -25,6 +26,19 @@ def create_dir(directory):
 
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-l", "--loss", default="con", help="verbose output")
+    args = parser.parse_args()
+
+    if args.loss not in ["con", "triplet", "con_triplet"]:
+        exit(1)
+
+    create_dir("./ckpt_{}_wav2letter".format(args.loss))
+    create_dir("./ckpt_{}_wav2letter/losses".format(args.loss))
+    create_dir("./ckpt_{}_wav2letter/model".format(args.loss))
+
+    train_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
+
     blank = "-"
 
     labels = [
@@ -41,48 +55,30 @@ if __name__ == "__main__":
         **{i: label for i, label in enumerate(labels)},
     }
 
-    decoder = CTCBeamDecoder(
-        labels,
-        model_path="./lm/lm_librispeech_kenlm_word_4g_200kvocab.bin",
-        alpha=0.522729216841,
-        beta=0.96506699808,
-        beam_width=1000,
-        blank_id=labels.index(blank),
-        log_probs_input=True
-    )
-
     num_features = 256
-    wav2letter = Wav2LetterEmbed(num_classes=len(char2index), num_features=num_features)
+    batch_size = 32
+    epochs = 10000
 
-    wav_base = Wav2vecSemantic(channels=256, prediction_steps=6)
-    wav_base.load_state_dict(
-        torch.load("./ckpt_con/model/wav2vec_semantic_con_256_e_30.ckpt",
+    wav2letter = Wav2LetterEmbed(num_classes=len(char2index), num_features=num_features)
+    wav_model = Wav2vecSemantic(channels=256, prediction_steps=6)
+    wav_model.load_state_dict(
+        torch.load("./ckpt_{}/model/wav2vec_semantic_{}_256_e_30.ckpt".format(args.loss, args.loss),
                    map_location=torch.device('cpu')))
 
-    test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
-    batch_size = 6
-    test_loader = DataLoader(dataset=test_data,
+    test_loader = DataLoader(dataset=train_data,
                              batch_size=batch_size,
                              pin_memory=True,
                              collate_fn=collate,
                              shuffle=False)
 
-    create_dir("./ckpt_wav2letter")
-    create_dir("./ckpt_wav2letter/losses")
-    create_dir("./ckpt_wav2letter/model")
-
     if train_on_gpu:
-        wav_base.cuda()
+        wav_model.cuda()
         wav2letter.cuda()
-
-    epochs = 10000
 
     criterion = torch.nn.CTCLoss(blank=labels.index(blank), zero_infinity=True)
     optimizer = Adam(wav2letter.parameters(), lr=1e-4)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6)
 
-    wav_base.eval()
-    wav2letter.train()
 
     def get_y_idxs(transcripts) -> Tensor:
         with torch.no_grad():
@@ -102,6 +98,8 @@ if __name__ == "__main__":
             return torch.tensor(y, dtype=torch.int16)
 
 
+    wav_model.eval()
+    wav2letter.train()
     for epoch_i in range(epochs):
         epoch_sub_losses = []
         for batch_i, (wave, texts) in enumerate(test_loader):
@@ -111,11 +109,10 @@ if __name__ == "__main__":
             y = get_y_idxs(texts)
 
             if train_on_gpu:
-                y = y.cuda()
-                wave = wave.cuda()
+                y, wave = y.cuda(), wave.cuda()
 
             with torch.no_grad():
-                c, _ = wav_base(wave)
+                c, _ = wav_model(wave)
 
             out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
 
@@ -125,23 +122,15 @@ if __name__ == "__main__":
             loss = criterion(out_p, y, input_lengths, target_lengths)
 
             loss_item = loss.item()
-            print(loss_item)
             epoch_sub_losses.append(loss_item)
 
             loss.backward()
             optimizer.step()
             scheduler.step(loss)
 
-            # TODO: MOVE TO DECODER
-            if batch_i + 1 % 100 == 0:
-                with torch.no_grad():
-                    beam_results, beam_scores, timesteps, out_lens = decoder.decode(
-                        out.permute(0, 2, 1))  # <- beam in (batch_size, input_length, number_of_classes)
-                    # First sentence
-                    print("target:", "".join(texts[0]))
-                    print("beam", "".join([index2char[n.item()] for n in beam_results[0][0][:out_lens[0][0]]]))
+        torch.save(wav2letter.state_dict(),
+                   "./ckpt_{}_wav/model/{}_wav2letter_e_{}.ckpt".format(args.loss, args.loss, epoch_i))
 
-        torch.save(wav2letter.state_dict(), "./ckpt_acc_wav/model/wav2letter_e_{}.ckpt".format(epoch_i))
-        with open('./ckpt_acc_wav/losses/epoch_batch_losses_e_{}_b.pkl'.format(epoch_i),
+        with open('./ckpt_{}_wav2letter/losses/epoch_batch_losses_e_{}_b.pkl'.format(args.loss, epoch_i),
                   'wb') as handle:
             pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
