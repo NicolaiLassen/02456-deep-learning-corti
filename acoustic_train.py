@@ -115,7 +115,7 @@ if __name__ == "__main__":
                 wave = wave.cuda()
 
             with torch.no_grad():
-                _, c = wav_base(wave)
+                c, _ = wav_base(wave)
 
             out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
 

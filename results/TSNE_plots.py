@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     wave, text = next(iter(test_loader))
 
-    z, c = model(wave)
+    c, z = model(wave)
 
     X = torch.stack([
         c.view(batch_size, -1),

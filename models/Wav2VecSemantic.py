@@ -70,7 +70,7 @@ class Wav2vecSemantic(nn.Module):
 
         # Case eval
         if not self.training:
-           return z, c
+            return c, z
 
         # Case: train on supervised
         if not contrastive:

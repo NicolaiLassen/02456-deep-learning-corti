@@ -1,6 +1,6 @@
 import os
 import pickle
-import torch
+
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
