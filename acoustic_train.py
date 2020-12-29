@@ -5,7 +5,6 @@ import seaborn as sns
 import torch
 import torchaudio
 # Linux gcc clang
-from ctcdecode import CTCBeamDecoder
 from torch.fft import Tensor
 from torch.optim import Adam, lr_scheduler
 from torch.utils.data import DataLoader
@@ -80,7 +79,7 @@ if __name__ == "__main__":
 
     criterion = torch.nn.CTCLoss(blank=labels.index(blank), zero_infinity=True)
     optimizer = Adam(wav2letter.parameters(), lr=1e-4)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6, verbose=True)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6)
 
     wav_base.eval()
     wav2letter.train()

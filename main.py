@@ -16,11 +16,9 @@ from utils.training import collate
 
 train_on_gpu = torch.cuda.is_available()
 
-
 def create_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
-
 
 def train_model_semantic(wav2vec: Wav2vecSemantic,
                          optimizer: optim,
@@ -140,10 +138,10 @@ if __name__ == "__main__":
                               collate_fn=collate,
                               shuffle=True)
 
-    # Define wav2vec model, optimizer and criterion
+    # Define wav2vec model, optimizer, lr_scheduler and criterion
     wav_model = Wav2vecSemantic(channels=256, prediction_steps=6)
     optimizer = Adam(wav_model.parameters(), lr=0.001)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6, verbose=True)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6)
 
     # Define electra model, loss and tokenizer
     tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')

@@ -9,6 +9,6 @@
  #BSUB -o logs/%J.out
  #BSUB -e logs/%J.err
  module load python3/3.6.2
- pip3 install --user -r requirements.txt
+ pip3 install --user -r ../requirements.txt
  echo "Traning..."
- python3 letter_acc.py
+ python3 ../acoustic_train.py
