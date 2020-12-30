@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
+from modules.gumble_vector_quantiszer import GumbelVectorQuantizer
+
 
 def buffered_arange(max):
     if not hasattr(buffered_arange, "buf"):
@@ -52,33 +54,41 @@ class Wav2vecSemantic(nn.Module):
                                )
         self.prediction = Wav2VecPrediction(channels=channels, prediction_steps=prediction_steps)
 
-        self.activation = activation
-        self.fc_1 = nn.Linear(in_features=transformer_size, out_features=transformer_size)
+        self.feature_out_size = channels
+        self.layer_norm = nn.LayerNorm(self.feature_out_size)
+
         self.transformer_size = transformer_size
 
-    def downsample_to_transformer(self, y: Tensor, idx_n: int) -> Tensor:
-        s_z = y.contiguous().view(1, y.shape[0], -1, self.transformer_size)
-        s_z = F.interpolate(s_z, size=(idx_n, self.transformer_size),
-                            mode='bicubic', align_corners=False).squeeze(0)
-        s_z = self.activation(s_z)
-        s_z = self.fc_1(s_z)
-        return s_z
+        self.quantizer = GumbelVectorQuantizer(
+            dim=self.feature_out_size,
+            combine_groups=False,
+            vq_dim=(),
+        )
 
-    def forward(self, x, contrastive=True, idx_n=None):
-        z = self.encoder(x)
-        c = self.context(z)
+    def quantize(self, z: Tensor) -> Tensor:
+        # f: Z -> Q
+        z = self.layer_norm(z)
+        return self.quantizer.forward_idx(z)
+
+    def forward(self, x, contrastive_train=False, semantic_train=False):
+        z = self.encoder(x)  # f: X -> Z
+        c = self.context(z)  # f: Z -> C
 
         # Case eval
-        if not self.training:
+        if not contrastive_train and not semantic_train:
             return c, z
 
-        # Case: train on supervised
-        if not contrastive:
-            return self.downsample_to_transformer(z, idx_n)
+        # Case: train only embed
+        if not contrastive_train:
+            return self.quantize(z)
 
         # Case: enable contrastive learnings
-        if contrastive:
+        if contrastive_train:
+
+            # k steps into future
             hk, z, z_n = self.prediction(c, z)
+
+            # shapes
             z_n = z_n.squeeze(0)
             batch = hk.shape[0]
             channels = hk.shape[1]
@@ -86,16 +96,17 @@ class Wav2vecSemantic(nn.Module):
 
             # sum_k=1^K
             k_start = 1
+            # calc buffer size
             prediction_steps = hk.shape[3] - k_start
             pred_step_range = batch * channels * length
             pred_ste_batch_range = pred_step_range * prediction_steps
 
+            # buffers
             prediction_buffer = torch.zeros(pred_ste_batch_range)
             target_buffer = torch.zeros(pred_ste_batch_range)
             target_n_buffer = torch.zeros(pred_ste_batch_range)
 
-            # sum_k=1^K
-            # TODO clean this method to be more optim!
+            # create prediction step vectors
             for i in range(k_start, prediction_steps):
                 prediction_buffer[pred_step_range * i:pred_step_range * (i + 1)] = torch.flatten(
                     input=hk[..., :, :, i])
@@ -118,12 +129,12 @@ class Wav2vecSemantic(nn.Module):
                 target_n_buffer.view(batch, channels, length, prediction_steps)
             )
 
-            # Case: train on mixed contrastive and supervised
-            if idx_n is not None:
-                return contrastive_pred, self.downsample_to_transformer(z, idx_n)
+            # Case: train only contrastive
+            if not semantic_train:
+                return contrastive_pred,
 
-            # Case: train on contrastive
-            return contrastive_pred
+            # Case: train mixed contrastive and supervised
+            return contrastive_pred, self.quantize(z)
 
 
 class Encoder(nn.Module):
@@ -157,7 +168,6 @@ class Context(nn.Module):
         self.activation = activation
         self.dropout = nn.Dropout(p=dropout)
 
-        # TODO: Make block
         # Layer 1
         self.c1 = nn.Conv1d(channels, channels, kernel_size, padding=1)
         self.norm1 = nn.GroupNorm(1, channels, affine=True)
@@ -216,23 +226,6 @@ class Context(nn.Module):
         c += residual
         return c
 
-        """
-        def context_conv_block(n_in, n_out, kernel_size, dropout, activation):
-            return nn.Sequential(
-                nn.Conv1d(n_in, n_out, kernel_size, padding=1),
-                nn.Dropout(p=dropout),
-                nn.GroupNorm(1, n_out, affine=False),
-                activation
-            )
-
-        self.conv_blocks = nn.ModuleList()
-
-        for i in range(0, layers):
-            self.conv_blocks.append(context_conv_block(channels, channels, kernel_size, dropout, activation))
-
-        self.context = nn.Sequential(*self.conv_blocks)
-        """
-
 
 class Wav2VecPrediction(nn.Module):
     def __init__(self, channels, prediction_steps=12):
@@ -242,6 +235,7 @@ class Wav2VecPrediction(nn.Module):
         self.n_negatives = 1
 
     # lambda_n = 1
+    # negative sample function from fairseq
     # https://github.com/pytorch/fairseq/blob/master/fairseq/models/wav2vec/wav2vec.py
     def sample_negatives(self, y: Tensor) -> Tensor:
         bsz, fsz, tsz = y.shape

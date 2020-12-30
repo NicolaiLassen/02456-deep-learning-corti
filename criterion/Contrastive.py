@@ -19,5 +19,5 @@ class ContrastiveLoss(torch.nn.Module):
         return torch.log(out)
 
     def forward(self, h_k: Tensor, z: Tensor, z_n: Tensor) -> Tensor:
-        # - (log σ(Z^T . HK)) + λE [log σ(ZN^T . HK)])
+        # - (log σ(Z^T . HK)) + λE(ZN~PN) [log σ(ZN^T . HK)])
         return - (self.log_sigmoid_probs(z, h_k) + self.log_sigmoid_probs(-z_n, h_k))

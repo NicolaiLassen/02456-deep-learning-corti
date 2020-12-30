@@ -1,3 +1,4 @@
+# Linux gcc clang
 import ctcdecode
 
 blank = "-"
@@ -24,3 +25,7 @@ class CTCBeamDecoder:
 
     def convert_to_string(self, tokens, vocab, seq_len):
         return ''.join([vocab[x] for x in tokens[0:seq_len]])
+
+
+if __name__ == "__main__":
+    "WER"

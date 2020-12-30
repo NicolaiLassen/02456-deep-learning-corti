@@ -4,6 +4,7 @@ import pickle
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
+
     PATH_con = "ckpt_con/losses_epoch"
     PATH_tri = "ckpt_triplet/losses_epoch"
     PATH_contri = "ckpt_con_triplet/losses_epoch"
@@ -30,3 +31,9 @@ if __name__ == "__main__":
     plt.title("Contrastive + Triplet loss")
     plt.xlabel("Epoch")
     plt.show()
+
+    # with (open("epoch_mean_losses_e_37.pkl", "rb")) as openfile:
+    #     loss = pickle.load(openfile)
+    #
+    # plt.plot(loss)
+    # plt.show()

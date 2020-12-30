@@ -5,10 +5,11 @@ import pickle
 import seaborn as sns
 import torch
 import torchaudio
-# Linux gcc clang
 from torch.fft import Tensor
-from torch.optim import Adam, lr_scheduler
+from torch.optim import AdamW, lr_scheduler
 from torch.utils.data import DataLoader
+
+# https://github.com/silversparro/wav2letter.pytorch
 
 from models.Wav2LetterEmbed import Wav2LetterEmbed
 from models.Wav2VecSemantic import Wav2vecSemantic
@@ -56,7 +57,7 @@ if __name__ == "__main__":
     }
 
     num_features = 256
-    batch_size = 32
+    batch_size = 8
     epochs = 10000
 
     wav2letter = Wav2LetterEmbed(num_classes=len(char2index), num_features=num_features)
@@ -65,18 +66,18 @@ if __name__ == "__main__":
         torch.load("./ckpt_{}/model/wav2vec_semantic_{}_256_e_30.ckpt".format(args.loss, args.loss),
                    map_location=torch.device('cpu')))
 
-    test_loader = DataLoader(dataset=train_data,
-                             batch_size=batch_size,
-                             pin_memory=True,
-                             collate_fn=collate,
-                             shuffle=False)
+    training_loader = DataLoader(dataset=train_data,
+                                 batch_size=batch_size,
+                                 pin_memory=True,
+                                 collate_fn=collate,
+                                 shuffle=False)
 
     if train_on_gpu:
         wav_model.cuda()
         wav2letter.cuda()
 
     criterion = torch.nn.CTCLoss(blank=labels.index(blank), zero_infinity=True)
-    optimizer = Adam(wav2letter.parameters(), lr=1e-4)
+    optimizer = AdamW(wav2letter.parameters(), lr=1e-4)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6)
 
 
@@ -102,7 +103,7 @@ if __name__ == "__main__":
     wav2letter.train()
     for epoch_i in range(epochs):
         epoch_sub_losses = []
-        for batch_i, (wave, texts) in enumerate(test_loader):
+        for batch_i, (wave, texts) in enumerate(training_loader):
             torch.cuda.empty_cache()
             optimizer.zero_grad()
 
@@ -123,6 +124,7 @@ if __name__ == "__main__":
 
             loss_item = loss.item()
             epoch_sub_losses.append(loss_item)
+            # print(loss_item)
 
             loss.backward()
             optimizer.step()
