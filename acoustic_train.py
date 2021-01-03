@@ -6,6 +6,7 @@ import seaborn as sns
 import torch
 import torchaudio
 from torch.fft import Tensor
+from torch.nn import CTCLoss
 from torch.optim import AdamW, lr_scheduler
 from torch.utils.data import DataLoader
 
@@ -75,7 +76,7 @@ if __name__ == "__main__":
         wav_model.cuda()
         wav2letter.cuda()
 
-    criterion = torch.nn.CTCLoss(blank=labels.index(blank), zero_infinity=True)
+    criterion = CTCLoss(blank=labels.index(blank), zero_infinity=True)
     optimizer = AdamW(wav2letter.parameters(), lr=lr)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6)
 
