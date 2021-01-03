@@ -101,7 +101,7 @@ def train_model_semantic(wav_model: Wav2vecSemantic,
 
             # Backprop
             loss.backward()
-            print(loss)
+            # print(loss) # test if it works
             optimizer.step()
             # lower the lr if the alg is stuck
             scheduler.step(loss)
