@@ -135,7 +135,7 @@ if __name__ == "__main__":
             optimizer.step()
             # lower the lr if the alg is stuck
             scheduler.step(loss)
-            # print(loss_item)
+            # print(loss.item())
             # graph
             epoch_sub_losses.append(loss.item())
 
