@@ -73,7 +73,7 @@ class Wav2vecSemantic(nn.Module):
         if not contrastive_train and context is None:
             return c, z
 
-        # Case: train only embed
+        # Case: train only context
         if not contrastive_train:
             return self.feature_transform(z, context)
 
@@ -128,7 +128,7 @@ class Wav2vecSemantic(nn.Module):
             if context is None:
                 return contrastive_pred
 
-            # Case: train mixed contrastive and supervised
+            # Case: train contrastive and context
             return contrastive_pred, self.feature_transform(z, context)
 
 

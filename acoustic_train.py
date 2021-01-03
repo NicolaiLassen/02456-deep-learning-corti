@@ -6,6 +6,7 @@ import seaborn as sns
 import torch
 import torchaudio
 from torch.fft import Tensor
+from torch.nn import CTCLoss
 from torch.optim import AdamW, lr_scheduler
 from torch.utils.data import DataLoader
 
@@ -33,7 +34,7 @@ if __name__ == "__main__":
         exit(1)
 
     create_dir("./ckpt_{}_wav2letter".format(args.loss))
-    create_dir("./ckpt_{}_wav2letter/losses".format(args.loss))
+    create_dir("./ckpt_{}_wav2letter/losses_epoch".format(args.loss))
     create_dir("./ckpt_{}_wav2letter/model".format(args.loss))
 
     train_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
@@ -75,9 +76,10 @@ if __name__ == "__main__":
         wav_model.cuda()
         wav2letter.cuda()
 
-    criterion = torch.nn.CTCLoss(blank=labels.index(blank), zero_infinity=True)
+    criterion = CTCLoss(blank=labels.index(blank), zero_infinity=True)
     optimizer = AdamW(wav2letter.parameters(), lr=lr)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6)
+
 
     def max_pad_batch_idx(transcripts) -> Tensor:
         with torch.no_grad():
@@ -98,12 +100,18 @@ if __name__ == "__main__":
 
 
     wav_model.eval()
-    wav2letter.train()
+    epoch_mean_losses = []
     for epoch_i in range(epochs):
+
+        # Enter training state
         epoch_sub_losses = []
-        for batch_i, (wave, texts) in enumerate(training_loader):
-            torch.cuda.empty_cache()
+        wav2letter.train()
+
+        for wave, texts in training_loader:
+
             optimizer.zero_grad()
+
+            torch.cuda.empty_cache()
 
             y = max_pad_batch_idx(texts)
 
@@ -121,17 +129,21 @@ if __name__ == "__main__":
             # CTC loss
             loss = criterion(out_p, y, input_lengths, target_lengths)
 
-            loss_item = loss.item()
-            epoch_sub_losses.append(loss_item)
-
+            # Backprop
             loss.backward()
+            # print(loss) # test if it works
             optimizer.step()
+            # lower the lr if the alg is stuck
             scheduler.step(loss)
             # print(loss_item)
+            # graph
+            epoch_sub_losses.append(loss.item())
+
+        epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
+
+        with open('./ckpt_{}_wav2letter/losses_epoch/epoch_mean_losses_e_{}.pkl'.format(args.loss, epoch_i),
+                  'wb') as handle:
+            pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         torch.save(wav2letter.state_dict(),
-                   "./ckpt_{}_wav/model/{}_wav2letter_e_{}.ckpt".format(args.loss, args.loss, epoch_i))
-
-        with open('./ckpt_{}_wav2letter/losses/epoch_batch_losses_e_{}_b.pkl'.format(args.loss, epoch_i),
-                  'wb') as handle:
-            pickle.dump(epoch_sub_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                   "./ckpt_{}_wav2letter/model/{}_wav2letter_e_{}.ckpt".format(args.loss, args.loss, epoch_i))
