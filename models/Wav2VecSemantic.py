@@ -3,9 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from modules.decoder import AttnDecoderRNN
-from modules.encoder import EncoderRNN
-
 
 def buffered_arange(max):
     if not hasattr(buffered_arange, "buf"):
@@ -55,16 +52,18 @@ class Wav2vecSemantic(nn.Module):
 
         self.feature_out_size = channels
 
+        # ref: https://arxiv.org/pdf/1706.03762.pdf
         nhead = 2
         head_dim = 128
         d_model = nhead * head_dim
         self.down_sample = nn.Conv1d(channels, channels, kernel_size=20, stride=20, padding=1)
         self.transformer = nn.Transformer(d_model=d_model, nhead=nhead, num_encoder_layers=2, num_decoder_layers=2)
 
-    def transform(self, z, context):
+    def feature_transform(self, z, context):
         # f: Z -> Q
         z = self.down_sample(z)
-        return self.transformer(z.permute(2, 0, 1), context)
+        z = z.permute(2, 0, 1)
+        return self.transformer(z, context)
 
     def forward(self, x, contrastive_train=False, context=None):
         z = self.encoder(x)  # f: X -> Z
@@ -76,8 +75,7 @@ class Wav2vecSemantic(nn.Module):
 
         # Case: train only embed
         if not contrastive_train:
-            # f: Z -> Q
-            return self.transform(z, context)
+            return self.feature_transform(z, context)
 
         # Case: enable contrastive learnings
         if contrastive_train:
@@ -128,10 +126,10 @@ class Wav2vecSemantic(nn.Module):
 
             # Case: train only contrastive
             if context is None:
-                return contrastive_pred,
+                return contrastive_pred
 
             # Case: train mixed contrastive and supervised
-            return contrastive_pred, self.transform(z, context)  # f: Z -> Q
+            return contrastive_pred, self.feature_transform(z, context)
 
 
 class Encoder(nn.Module):
@@ -277,17 +275,3 @@ class Wav2VecPrediction(nn.Module):
         # get distractor samples
         z_n = self.sample_negatives(z)
         return c, z, z_n
-
-
-class FeatureAggregator(nn.Module):
-    def __init__(self, hidden_size):
-        super(FeatureAggregator, self).__init__()
-
-        self.encoder = EncoderRNN(hidden_size)
-        self.decoder = AttnDecoderRNN(hidden_size)
-
-    def forward(self, z):
-        out, state = self.encoder(z)
-        state = state.squeeze(0)
-        self.decoder()
-        return

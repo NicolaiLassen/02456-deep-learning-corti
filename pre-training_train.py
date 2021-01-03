@@ -22,7 +22,7 @@ def create_dir(directory):
         os.makedirs(directory)
 
 
-def train_model_semantic(wav2vec: Wav2vecSemantic,
+def train_model_semantic(wav_model: Wav2vecSemantic,
                          optimizer: optim,
                          scheduler: lr_scheduler,
                          epochs: int,
@@ -35,9 +35,10 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
     create_dir("./ckpt_{}/losses_epoch".format(args.loss))
     create_dir("./ckpt_{}/model".format(args.loss))
 
+    # context weight
     alpha = 0.4
 
-    wav_model = wav2vec
+    # define loss
     con_criterion = ContrastiveLoss()
     triplet_criterion = torch.nn.TripletMarginWithDistanceLoss(
         distance_function=torch.nn.PairwiseDistance())
@@ -104,9 +105,9 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
             optimizer.step()
             # lower the lr if the alg is stuck
             scheduler.step(loss)
-
             # graph
             epoch_sub_losses.append(loss.item())
+
         epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
 
         with open('./ckpt_{}/losses_batch/epoch_batch_losses_e_{}_b.pkl'.format(args.loss, epoch_i),
@@ -120,21 +121,19 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
                                                                                                       args.loss,
                                                                                                       epoch_i))
 
-    return wav_model, epoch_mean_losses
-
 
 if __name__ == "__main__":
     train_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
     test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="test-clean", download=True)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-l", "--loss", default="con_triplet", help="verbose output")
+    parser.add_argument("-l", "--loss", default="con", help="Pick the loss and the traning method")
     args = parser.parse_args()
 
     if args.loss not in ["con", "triplet", "con_triplet"]:
         exit(1)
 
-    batch_size = 4  # 16
+    batch_size = 2
     train_loader = DataLoader(dataset=train_data,
                               batch_size=batch_size,
                               pin_memory=True,
@@ -146,15 +145,15 @@ if __name__ == "__main__":
     optimizer = Adam(wav_model.parameters(), lr=0.001)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=10)
 
-    # Define electra model, loss and tokenizer
+    # Define electra model and tokenizer
     tokenizer = ElectraTokenizer.from_pretrained('google/electra-small-discriminator')
     electra_model = ElectraModel.from_pretrained('google/electra-small-discriminator', return_dict=True)
 
-    model, losses = train_model_semantic(wav2vec=wav_model,
-                                         optimizer=optimizer,
-                                         scheduler=scheduler,
-                                         epochs=100,
-                                         args=args,
-                                         training_loader=train_loader,
-                                         tokenizer=tokenizer,
-                                         semantic_model=electra_model)
+    train_model_semantic(wav_model=wav_model,
+                         optimizer=optimizer,
+                         scheduler=scheduler,
+                         epochs=100,
+                         args=args,
+                         training_loader=train_loader,
+                         tokenizer=tokenizer,
+                         semantic_model=electra_model)
