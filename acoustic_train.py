@@ -9,8 +9,6 @@ from torch.fft import Tensor
 from torch.optim import AdamW, lr_scheduler
 from torch.utils.data import DataLoader
 
-# https://github.com/silversparro/wav2letter.pytorch
-
 from models.Wav2LetterEmbed import Wav2LetterEmbed
 from models.Wav2VecSemantic import Wav2vecSemantic
 from utils.training import collate
@@ -56,11 +54,12 @@ if __name__ == "__main__":
         **{i: label for i, label in enumerate(labels)},
     }
 
+    lr = 1e-4
     num_features = 256
     batch_size = 8
     epochs = 10000
 
-    wav2letter = Wav2LetterEmbed(num_classes=len(char2index), num_features=num_features)
+    wav2letter = Wav2LetterEmbed(num_classes=len(labels), num_features=num_features)
     wav_model = Wav2vecSemantic(channels=256, prediction_steps=6)
     wav_model.load_state_dict(
         torch.load("./ckpt_{}/model/wav2vec_semantic_{}_256_e_30.ckpt".format(args.loss, args.loss),
@@ -77,11 +76,10 @@ if __name__ == "__main__":
         wav2letter.cuda()
 
     criterion = torch.nn.CTCLoss(blank=labels.index(blank), zero_infinity=True)
-    optimizer = AdamW(wav2letter.parameters(), lr=1e-4)
+    optimizer = AdamW(wav2letter.parameters(), lr=lr)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6)
 
-
-    def get_y_idxs(transcripts) -> Tensor:
+    def max_pad_batch_idx(transcripts) -> Tensor:
         with torch.no_grad():
             y = []
             len_max = len(max(transcripts, key=len))
@@ -95,7 +93,7 @@ if __name__ == "__main__":
                 # pad to longest
                 y[i] += [labels.index(blank)] * (len_max - len(y[i]))
 
-            # return int tensor
+            # return int16 tensor
             return torch.tensor(y, dtype=torch.int16)
 
 
@@ -107,7 +105,7 @@ if __name__ == "__main__":
             torch.cuda.empty_cache()
             optimizer.zero_grad()
 
-            y = get_y_idxs(texts)
+            y = max_pad_batch_idx(texts)
 
             if train_on_gpu:
                 y, wave = y.cuda(), wave.cuda()
@@ -120,15 +118,16 @@ if __name__ == "__main__":
             out_p = out.permute(2, 0, 1)  # <- log_probs in (input_length, batch_size, number_of_classes)
             input_lengths = torch.full((batch_size,), fill_value=out_p.size(0), dtype=torch.int32)
             target_lengths = torch.full((batch_size,), fill_value=y.size(1), dtype=torch.int32)
+            # CTC loss
             loss = criterion(out_p, y, input_lengths, target_lengths)
 
             loss_item = loss.item()
             epoch_sub_losses.append(loss_item)
-            # print(loss_item)
 
             loss.backward()
             optimizer.step()
             scheduler.step(loss)
+            # print(loss_item)
 
         torch.save(wav2letter.state_dict(),
                    "./ckpt_{}_wav/model/{}_wav2letter_e_{}.ckpt".format(args.loss, args.loss, epoch_i))

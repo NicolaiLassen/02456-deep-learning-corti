@@ -10,7 +10,7 @@ from torch.optim import Adam, lr_scheduler
 from torch.utils.data import DataLoader
 from transformers import ElectraTokenizer, ElectraModel
 
-from criterion.Contrastive import ContrastiveLoss
+from criterion.ContrastiveWav import ContrastiveLoss
 from models.Wav2VecSemantic import Wav2vecSemantic
 from utils.training import collate
 
@@ -29,14 +29,13 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
                          args: argparse.Namespace,
                          training_loader: DataLoader,
                          tokenizer,
-                         semantic_model,
-                         batch_size) -> (Wav2vecSemantic, List):
+                         semantic_model) -> (Wav2vecSemantic, List):
     create_dir("./ckpt_{}".format(args.loss))
     create_dir("./ckpt_{}/losses_batch".format(args.loss))
     create_dir("./ckpt_{}/losses_epoch".format(args.loss))
     create_dir("./ckpt_{}/model".format(args.loss))
 
-    beta = 0.4
+    alpha = 0.4
 
     wav_model = wav2vec
     con_criterion = ContrastiveLoss()
@@ -68,7 +67,7 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
             # Select training type
             loss = None
             if args.loss == "con":
-                hk, z, z_n = wav_model(x=wave)
+                hk, z, z_n = wav_model(x=wave, contrastive_train=True)
                 loss = con_criterion(hk, z, z_n)
 
             if args.loss == "triplet" or \
@@ -87,22 +86,21 @@ def train_model_semantic(wav2vec: Wav2vecSemantic,
                 if train_on_gpu:
                     e_embed = e_embed.cuda()
 
-                embed_shape = e_embed.shape[1]
+                e_embed_p = e_embed[:batch_length].permute(1, 0, 2)
+                e_embed_n = e_embed[batch_length:batch_length * 2].permute(1, 0, 2)
 
                 if args.loss is "triplet":
-                    z_embed = wav_model(x=wave, contrastive=False, idx_n=embed_shape)
-                    loss = triplet_criterion(z_embed, e_embed[:batch_length], e_embed[batch_length:batch_length * 2])
+                    z_embed = wav_model(x=wave, contrastive_train=False, context=e_embed_p)
+                    loss = triplet_criterion(z_embed, e_embed_p, e_embed_n)
                 else:
-                    (hk, z, z_n), z_embed = wav_model(x=wave, idx_n=embed_shape)
+                    (hk, z, z_n), z_embed = wav_model(x=wave, contrastive_train=True, context=e_embed_p)
                     loss_con = con_criterion(hk, z, z_n)
-
-                    loss_triplet = triplet_criterion(z_embed, e_embed[:batch_length],
-                                                     e_embed[batch_length:batch_length * 2])
-
-                    loss = loss_con + loss_triplet * beta
+                    loss_triplet = triplet_criterion(z_embed, e_embed_p, e_embed_n)
+                    loss = loss_con + loss_triplet * alpha
 
             # Backprop
             loss.backward()
+            print(loss)
             optimizer.step()
             # lower the lr if the alg is stuck
             scheduler.step(loss)
@@ -159,5 +157,4 @@ if __name__ == "__main__":
                                          args=args,
                                          training_loader=train_loader,
                                          tokenizer=tokenizer,
-                                         semantic_model=electra_model,
-                                         batch_size=batch_size)
+                                         semantic_model=electra_model)

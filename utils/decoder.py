@@ -11,8 +11,7 @@ labels = [
 
 
 class CTCBeamDecoder:
-
-    def __init__(self, beam_size=100, blank_id=labels.index(blank),
+    def __init__(self, beam_size=1000, blank_id=labels.index(blank),
                  kenlm_path="./lm/lm_librispeech_kenlm_word_4g_200kvocab.bin"):
         self.decoder = ctcdecode.CTCBeamDecoder(
             labels, alpha=0.522729216841, beta=0.96506699808,

@@ -3,7 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from modules.gumble_vector_quantiszer import GumbelVectorQuantizer
+from modules.decoder import AttnDecoderRNN
+from modules.encoder import EncoderRNN
 
 
 def buffered_arange(max):
@@ -25,10 +26,9 @@ def log_compression(x: Tensor) -> Tensor:
 class Wav2vecSemantic(nn.Module):
 
     def __init__(self,
-                 channels=512,
+                 channels=256,
                  activation=nn.ReLU(),
                  dropout=0.1,
-                 transformer_size=256,
                  prediction_steps=12
                  ):
         super(Wav2vecSemantic, self).__init__()
@@ -41,8 +41,7 @@ class Wav2vecSemantic(nn.Module):
 
         context_layers = 5
 
-        self.encoder = Encoder(channels=channels,
-                               activation=activation,
+        self.encoder = Encoder(activation=activation,
                                dropout=dropout,
                                layers=encoder_layers
                                )
@@ -55,32 +54,30 @@ class Wav2vecSemantic(nn.Module):
         self.prediction = Wav2VecPrediction(channels=channels, prediction_steps=prediction_steps)
 
         self.feature_out_size = channels
-        self.layer_norm = nn.LayerNorm(self.feature_out_size)
 
-        self.transformer_size = transformer_size
+        nhead = 2
+        head_dim = 128
+        d_model = nhead * head_dim
+        self.down_sample = nn.Conv1d(channels, channels, kernel_size=20, stride=20, padding=1)
+        self.transformer = nn.Transformer(d_model=d_model, nhead=nhead, num_encoder_layers=2, num_decoder_layers=2)
 
-        self.quantizer = GumbelVectorQuantizer(
-            dim=self.feature_out_size,
-            combine_groups=False,
-            vq_dim=(),
-        )
-
-    def quantize(self, z: Tensor) -> Tensor:
+    def transform(self, z, context):
         # f: Z -> Q
-        z = self.layer_norm(z)
-        return self.quantizer.forward_idx(z)
+        z = self.down_sample(z)
+        return self.transformer(z.permute(2, 0, 1), context)
 
-    def forward(self, x, contrastive_train=False, semantic_train=False):
+    def forward(self, x, contrastive_train=False, context=None):
         z = self.encoder(x)  # f: X -> Z
         c = self.context(z)  # f: Z -> C
 
         # Case eval
-        if not contrastive_train and not semantic_train:
+        if not contrastive_train and context is None:
             return c, z
 
         # Case: train only embed
         if not contrastive_train:
-            return self.quantize(z)
+            # f: Z -> Q
+            return self.transform(z, context)
 
         # Case: enable contrastive learnings
         if contrastive_train:
@@ -99,12 +96,12 @@ class Wav2vecSemantic(nn.Module):
             # calc buffer size
             prediction_steps = hk.shape[3] - k_start
             pred_step_range = batch * channels * length
-            pred_ste_batch_range = pred_step_range * prediction_steps
+            pred_step_batch_range = pred_step_range * prediction_steps
 
             # buffers
-            prediction_buffer = torch.zeros(pred_ste_batch_range)
-            target_buffer = torch.zeros(pred_ste_batch_range)
-            target_n_buffer = torch.zeros(pred_ste_batch_range)
+            prediction_buffer = torch.zeros(pred_step_batch_range)
+            target_buffer = torch.zeros(pred_step_batch_range)
+            target_n_buffer = torch.zeros(pred_step_batch_range)
 
             # create prediction step vectors
             for i in range(k_start, prediction_steps):
@@ -130,15 +127,15 @@ class Wav2vecSemantic(nn.Module):
             )
 
             # Case: train only contrastive
-            if not semantic_train:
+            if context is None:
                 return contrastive_pred,
 
             # Case: train mixed contrastive and supervised
-            return contrastive_pred, self.quantize(z)
+            return contrastive_pred, self.transform(z, context)  # f: Z -> Q
 
 
 class Encoder(nn.Module):
-    def __init__(self, channels, activation, dropout, layers):
+    def __init__(self, activation, dropout, layers):
         super(Encoder, self).__init__()
 
         def encoder_conv_block(n_in, n_out, kernel_size, stride, dropout, activation):
@@ -168,6 +165,7 @@ class Context(nn.Module):
         self.activation = activation
         self.dropout = nn.Dropout(p=dropout)
 
+        # Context layers
         # Layer 1
         self.c1 = nn.Conv1d(channels, channels, kernel_size, padding=1)
         self.norm1 = nn.GroupNorm(1, channels, affine=True)
@@ -194,7 +192,7 @@ class Context(nn.Module):
         c += residual
         residual = c
 
-        # Layer2
+        # Layer 2
         c = self.c2(c)
         c = self.dropout(c)
         c = self.norm2(c)
@@ -202,7 +200,7 @@ class Context(nn.Module):
         c += residual
         residual = c
 
-        # Layer3
+        # Layer 3
         c = self.c3(c)
         c = self.dropout(c)
         c = self.norm3(c)
@@ -210,7 +208,7 @@ class Context(nn.Module):
         c += residual
         residual = c
 
-        # Layer4
+        # Layer 4
         c = self.c4(c)
         c = self.dropout(c)
         c = self.norm4(c)
@@ -218,7 +216,7 @@ class Context(nn.Module):
         c += residual
         residual = c
 
-        # Layer5
+        # Layer 5
         c = self.c5(c)
         c = self.dropout(c)
         c = self.norm5(c)
@@ -236,7 +234,7 @@ class Wav2VecPrediction(nn.Module):
 
     # lambda_n = 1
     # negative sample function from fairseq
-    # https://github.com/pytorch/fairseq/blob/master/fairseq/models/wav2vec/wav2vec.py
+    # ref: https://github.com/pytorch/fairseq/blob/master/fairseq/models/wav2vec/wav2vec.py
     def sample_negatives(self, y: Tensor) -> Tensor:
         bsz, fsz, tsz = y.shape
 
@@ -279,3 +277,17 @@ class Wav2VecPrediction(nn.Module):
         # get distractor samples
         z_n = self.sample_negatives(z)
         return c, z, z_n
+
+
+class FeatureAggregator(nn.Module):
+    def __init__(self, hidden_size):
+        super(FeatureAggregator, self).__init__()
+
+        self.encoder = EncoderRNN(hidden_size)
+        self.decoder = AttnDecoderRNN(hidden_size)
+
+    def forward(self, z):
+        out, state = self.encoder(z)
+        state = state.squeeze(0)
+        self.decoder()
+        return

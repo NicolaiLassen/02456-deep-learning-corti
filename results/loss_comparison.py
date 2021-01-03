@@ -4,7 +4,7 @@ import torch
 import torchaudio.models
 from torch.utils.data import DataLoader
 
-from criterion.Contrastive import ContrastiveLoss
+from criterion.ContrastiveWav import ContrastiveLoss
 from models.Wav2VecSemantic import Wav2vecSemantic
 from utils.training import collate
 

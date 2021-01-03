@@ -1,9 +1,7 @@
 import os
-from multiprocessing import Pool
 
 import librosa
 import soundfile as sf
-from torch.utils.data.dataloader import DataLoader
 
 
 def convert_file_format(in_path, out_path):
@@ -46,25 +44,3 @@ def preprocessing(args):
     _, file_extension = os.path.splitext(file_path)
     new_file_path = os.path.join(output_path, str(file_index) + file_extension)
     convert_to_16k(file_path, new_file_path)
-
-
-class AudioPreprocessor:
-    def __init__(self, n_thread=2, out_path='./temp'):
-        self.n_thread = n_thread
-        self.output_path = os.path.abspath(out_path)
-        self.pool = Pool(self.n_thread)
-
-    def transcribe(self, sound_files):
-        self.pool.map(preprocessing, [(sound_files[i], i, self.output_path) for i in range(0, len(sound_files))])
-        self.pool.terminate()
-
-    def load_data(self, batch_size=256, test_size=0.1, valid_size=0.2):
-        # Check if the file path is created for our preprocessed data
-        assert os.path.isdir(self.output_path) == True
-
-        data_set = DataLoader(self.output_path,
-                              batch_size=batch_size,
-                              shuffle=True,
-                              num_workers=self.n_thread)
-
-        # waveform, sample_rate = torchaudio.load(filename)
