@@ -162,3 +162,7 @@ fabric.properties
 /ckpt_con
 /ckpt_con_triplet
 /ckpt_triplet
+
+/ckpt_con_wav2letter
+/ckpt_con_triplet_wav2letter
+/ckpt_triplet_wav2letter
