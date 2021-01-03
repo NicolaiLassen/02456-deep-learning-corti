@@ -93,6 +93,7 @@ def train_model_semantic(wav_model: Wav2vecSemantic,
                 if args.loss is "triplet":
                     z_embed = wav_model(x=wave, contrastive_train=False, context=e_embed_p)
                     loss = triplet_criterion(z_embed, e_embed_p, e_embed_n)
+                    print(loss)
                 else:
                     (hk, z, z_n), z_embed = wav_model(x=wave, contrastive_train=True, context=e_embed_p)
                     loss_con = con_criterion(hk, z, z_n)
@@ -127,7 +128,7 @@ if __name__ == "__main__":
     test_data = torchaudio.datasets.LIBRISPEECH("./data/", url="test-clean", download=True)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-l", "--loss", default="con", help="Pick the loss and the traning method")
+    parser.add_argument("-l", "--loss", default="triplet", help="Pick the loss and the traning method")
     args = parser.parse_args()
 
     if args.loss not in ["con", "triplet", "con_triplet"]:
