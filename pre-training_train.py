@@ -133,7 +133,7 @@ if __name__ == "__main__":
     if args.loss not in ["con", "triplet", "con_triplet"]:
         exit(1)
 
-    batch_size = 2
+    batch_size = 8
     train_loader = DataLoader(dataset=train_data,
                               batch_size=batch_size,
                               pin_memory=True,
