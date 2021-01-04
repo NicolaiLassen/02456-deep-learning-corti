@@ -11,15 +11,18 @@ labels = [
 
 
 class CTCBeamDecoder:
-    def __init__(self, kenlm_path, beam_size=8000, blank_id=labels.index(blank)):
+    def __init__(self, kenlm_path, beam_size=1000):
         self.decoder = ctcdecode.CTCBeamDecoder(
-            labels, alpha=0.922729216841, beta=0.66506699808,
-            beam_width=beam_size, blank_id=blank_id,
+            labels,
+            log_probs_input=True,
+            alpha=0.922729216841,
+            beta=0.66506699808,
+            beam_width=beam_size,
+            blank_id=labels.index(blank),
             model_path=kenlm_path)
 
     def __call__(self, output):
         beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(output)
-        print(beam_result)
         return self.convert_to_string(beam_result[0][0], labels, out_seq_len[0][0])
 
     def convert_to_string(self, tokens, vocab, seq_len):

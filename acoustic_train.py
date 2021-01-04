@@ -138,7 +138,7 @@ if __name__ == "__main__":
                 optimizer.step()
                 # lower the lr if the alg is stuck
                 scheduler.step(loss)
-                print(loss.item())
+                # print(loss.item())
                 # graph
                 epoch_sub_losses.append(loss.item())
             except:
@@ -151,4 +151,4 @@ if __name__ == "__main__":
             pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         torch.save(wav2letter.state_dict(),
-                   "./ckpt_{}_wav2letter/model/{}_wav2letterss.ckpt".format(args.loss, args.loss))
+                   "./ckpt_{}_wav2letter/model/{}_wav2letter.ckpt".format(args.loss, args.loss))

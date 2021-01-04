@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from models.Wav2LetterEmbed import Wav2LetterEmbed
 from models.Wav2VecSemantic import Wav2vecSemantic
-from ctcdecode import CTCBeamDecoder
+from utils.decoder import CTCBeamDecoder
 from utils.training import collate
 
 sns.set()
@@ -25,7 +25,7 @@ def create_dir(directory):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-l", "--loss", default="con", help="verbose output")
+    parser.add_argument("-l", "--loss", default="con_triplet", help="verbose output")
     args = parser.parse_args()
 
     if args.loss not in ["con", "triplet", "con_triplet"]:
@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     wav2letter = Wav2LetterEmbed(num_classes=len(labels), num_features=num_features)
     wav2letter.load_state_dict(
-        torch.load("./ckpt_{}_wav2letter/model/{}_wav2letterss.ckpt".format(args.loss, args.loss),
+        torch.load("./ckpt_{}_wav2letter/model/{}_wav2letter.ckpt".format(args.loss, args.loss),
                    map_location=torch.device('cpu')
                    ),
     )
@@ -70,17 +70,7 @@ if __name__ == "__main__":
                                  pin_memory=True,
                                  collate_fn=collate,
                                  shuffle=False)
-
-    decoder = CTCBeamDecoder(
-        labels,
-        model_path="./lm/lm_librispeech_kenlm_word_4g_200kvocab.bin",
-        alpha=0.522729216841,
-        beta=0.66506699808,
-        beam_width=60000,
-        blank_id=labels.index(blank),
-        log_probs_input=True
-    )
-
+    decoder = CTCBeamDecoder("./lm/lm_librispeech_kenlm_word_4g_200kvocab.bin")
 
     def max_pad_batch_idx(transcripts) -> Tensor:
         with torch.no_grad():
@@ -117,11 +107,7 @@ if __name__ == "__main__":
                 c, _ = wav_model(wave)
 
             out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
-
-            beam_results, beam_scores, timesteps, out_lens = decoder.decode(
-                out.permute(0, 2, 1))  # <- beam in (batch_size, input_length, number_of_classes)
-            # First sentence
-            print("target:", "".join(texts[0]))
-            print("Log probs:", "".join([index2char[n.item()] for n in beam_results[0][0][:out_lens[0][0]]]))
+            decoded = decoder(out.permute(0, 2, 1))# <- beam in (batch_size, input_length, number_of_classes)
+            print(decoded)
 
         break
