@@ -57,7 +57,7 @@ if __name__ == "__main__":
 
     lr = 1e-3
     num_features = 256
-    batch_size = 16
+    batch_size = 32
     epochs = 10000
 
     wav2letter = Wav2LetterEmbed(num_classes=len(labels), num_features=num_features)
