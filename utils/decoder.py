@@ -11,15 +11,15 @@ labels = [
 
 
 class CTCBeamDecoder:
-    def __init__(self, beam_size=1000, blank_id=labels.index(blank),
-                 kenlm_path="./lm/lm_librispeech_kenlm_word_4g_200kvocab.bin"):
+    def __init__(self, kenlm_path, beam_size=8000, blank_id=labels.index(blank)):
         self.decoder = ctcdecode.CTCBeamDecoder(
-            labels, alpha=0.522729216841, beta=0.96506699808,
+            labels, alpha=0.922729216841, beta=0.66506699808,
             beam_width=beam_size, blank_id=blank_id,
             model_path=kenlm_path)
 
     def __call__(self, output):
         beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(output)
+        print(beam_result)
         return self.convert_to_string(beam_result[0][0], labels, out_seq_len[0][0])
 
     def convert_to_string(self, tokens, vocab, seq_len):

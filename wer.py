@@ -1,17 +1,15 @@
 import argparse
 import os
-import pickle
 
 import seaborn as sns
 import torch
 import torchaudio
 from torch.fft import Tensor
-from torch.nn import CTCLoss
-from torch.optim import lr_scheduler, SGD
 from torch.utils.data import DataLoader
 
 from models.Wav2LetterEmbed import Wav2LetterEmbed
 from models.Wav2VecSemantic import Wav2vecSemantic
+from ctcdecode import CTCBeamDecoder
 from utils.training import collate
 
 sns.set()
@@ -33,10 +31,6 @@ if __name__ == "__main__":
     if args.loss not in ["con", "triplet", "con_triplet"]:
         exit(1)
 
-    create_dir("./ckpt_{}_wav2letter".format(args.loss))
-    create_dir("./ckpt_{}_wav2letter/losses_epoch".format(args.loss))
-    create_dir("./ckpt_{}_wav2letter/model".format(args.loss))
-
     train_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
 
     blank = "-"
@@ -55,12 +49,17 @@ if __name__ == "__main__":
         **{i: label for i, label in enumerate(labels)},
     }
 
-    lr = 1e-3
+    lr = 1e-4
     num_features = 256
-    batch_size = 16
+    batch_size = 1
     epochs = 10000
 
     wav2letter = Wav2LetterEmbed(num_classes=len(labels), num_features=num_features)
+    wav2letter.load_state_dict(
+        torch.load("./ckpt_{}_wav2letter/model/{}_wav2letterss.ckpt".format(args.loss, args.loss),
+                   map_location=torch.device('cpu')
+                   ),
+    )
     wav_model = Wav2vecSemantic(channels=256, prediction_steps=6)
     wav_model.load_state_dict(
         torch.load("./ckpt_{}/model/wav2vec_semantic_{}_256_e_30.ckpt".format(args.loss, args.loss),
@@ -72,13 +71,15 @@ if __name__ == "__main__":
                                  collate_fn=collate,
                                  shuffle=False)
 
-    if train_on_gpu:
-        wav_model.cuda()
-        wav2letter.cuda()
-
-    criterion = CTCLoss(blank=labels.index(blank), zero_infinity=True)
-    optimizer = SGD(wav2letter.parameters(), lr=lr)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=50)
+    decoder = CTCBeamDecoder(
+        labels,
+        model_path="./lm/lm_librispeech_kenlm_word_4g_200kvocab.bin",
+        alpha=0.522729216841,
+        beta=0.66506699808,
+        beam_width=60000,
+        blank_id=labels.index(blank),
+        log_probs_input=True
+    )
 
 
     def max_pad_batch_idx(transcripts) -> Tensor:
@@ -106,49 +107,21 @@ if __name__ == "__main__":
 
         # Enter training state
         epoch_sub_losses = []
-        wav2letter.train()
+        wav2letter.eval()
 
         for wave, texts in training_loader:
-            # try catch to fix last batch size 
-            try:
-                optimizer.zero_grad()
+            # try catch to fix last batch size
+            y = max_pad_batch_idx(texts)
 
-                torch.cuda.empty_cache()
+            with torch.no_grad():
+                c, _ = wav_model(wave)
 
-                y = max_pad_batch_idx(texts)
+            out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
 
-                if train_on_gpu:
-                    y, wave = y.cuda(), wave.cuda()
+            beam_results, beam_scores, timesteps, out_lens = decoder.decode(
+                out.permute(0, 2, 1))  # <- beam in (batch_size, input_length, number_of_classes)
+            # First sentence
+            print("target:", "".join(texts[0]))
+            print("Log probs:", "".join([index2char[n.item()] for n in beam_results[0][0][:out_lens[0][0]]]))
 
-                with torch.no_grad():
-                    c, _ = wav_model(wave)
-
-                out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
-
-                out_p = out.permute(2, 0, 1)  # <- log_probs in (input_length, batch_size, number_of_classes)
-                input_lengths = torch.full((batch_size,), fill_value=out_p.size(0), dtype=torch.int32)
-                target_lengths = torch.full((batch_size,), fill_value=y.size(1), dtype=torch.int32)
-                # CTC loss
-                loss = criterion(out_p, y, input_lengths, target_lengths)
-
-                # print(texts)
-                # Backprop
-                loss.backward()
-                # print(loss) # test if it works
-                optimizer.step()
-                # lower the lr if the alg is stuck
-                scheduler.step(loss)
-                print(loss.item())
-                # graph
-                epoch_sub_losses.append(loss.item())
-            except:
-                continue
-
-        epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
-
-        with open('./ckpt_{}_wav2letter/losses_epoch/epoch_mean_losses_e_{}.pkl'.format(args.loss, epoch_i),
-                  'wb') as handle:
-            pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-        torch.save(wav2letter.state_dict(),
-                   "./ckpt_{}_wav2letter/model/{}_wav2letterss.ckpt".format(args.loss, args.loss))
+        break

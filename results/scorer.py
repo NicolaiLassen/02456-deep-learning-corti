@@ -1,5 +1,6 @@
 import jiwer
 import numpy as np
+import torchaudio
 
 
 def get_asr_metric(ground_truths, hypotheses):
@@ -23,6 +24,5 @@ def get_asr_metric(ground_truths, hypotheses):
 
 
 if __name__ == '__main__':
-    ground_truth = "chapter one missus rachel lynde is surprised missus rachel lynde lived just where the avonlea main road dipped down into a little hollow fringed with alders and ladies eardrops and traversed by a brook"
-    hypothesis = "chapter one missus rachel lynde russell e s here the avonlea a road led to all old red oh alders and ladies arosa rared a broo"
-    print(get_asr_metric([ground_truth, "test test test", "test"], [hypothesis, "test test test", "test"]))
+    train_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
+
