@@ -108,37 +108,39 @@ if __name__ == "__main__":
         wav2letter.train()
 
         for wave, texts in training_loader:
+            # try catch to fix last batch size 
+            try:
+                optimizer.zero_grad()
 
-            optimizer.zero_grad()
+                torch.cuda.empty_cache()
 
-            torch.cuda.empty_cache()
+                y = max_pad_batch_idx(texts)
 
-            y = max_pad_batch_idx(texts)
+                if train_on_gpu:
+                    y, wave = y.cuda(), wave.cuda()
 
-            if train_on_gpu:
-                y, wave = y.cuda(), wave.cuda()
+                with torch.no_grad():
+                    c, _ = wav_model(wave)
 
-            with torch.no_grad():
-                c, _ = wav_model(wave)
+                out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
 
-            out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
+                out_p = out.permute(2, 0, 1)  # <- log_probs in (input_length, batch_size, number_of_classes)
+                input_lengths = torch.full((batch_size,), fill_value=out_p.size(0), dtype=torch.int32)
+                target_lengths = torch.full((batch_size,), fill_value=y.size(1), dtype=torch.int32)
+                # CTC loss
+                loss = criterion(out_p, y, input_lengths, target_lengths)
 
-            out_p = out.permute(2, 0, 1)  # <- log_probs in (input_length, batch_size, number_of_classes)
-            input_lengths = torch.full((batch_size,), fill_value=out_p.size(0), dtype=torch.int32)
-            target_lengths = torch.full((batch_size,), fill_value=y.size(1), dtype=torch.int32)
-            # CTC loss
-            loss = criterion(out_p, y, input_lengths, target_lengths)
-
-            # Backprop
-            loss.backward()
-            # print(loss) # test if it works
-            optimizer.step()
-            # lower the lr if the alg is stuck
-            scheduler.step(loss)
-            # print(loss.item())
-            # graph
-            print(loss.item())
-            epoch_sub_losses.append(loss.item())
+                # Backprop
+                loss.backward()
+                # print(loss) # test if it works
+                optimizer.step()
+                # lower the lr if the alg is stuck
+                scheduler.step(loss)
+                # print(loss.item())
+                # graph
+                epoch_sub_losses.append(loss.item())
+            except:
+                continue
 
         epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
 
