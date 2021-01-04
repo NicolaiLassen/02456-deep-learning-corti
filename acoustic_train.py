@@ -137,6 +137,7 @@ if __name__ == "__main__":
             scheduler.step(loss)
             # print(loss.item())
             # graph
+            print(loss.item())
             epoch_sub_losses.append(loss.item())
 
         epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
