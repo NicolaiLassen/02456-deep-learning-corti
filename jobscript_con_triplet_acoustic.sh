@@ -1,6 +1,6 @@
 #!/bin/sh
  #BSUB -q gpuv100
- #BSUB -gpu "num=1"
+ #BSUB -gpu "num=2"
  #BSUB -J a_con_triplet
  #BSUB -n 1
  #BSUB -W 24:00
