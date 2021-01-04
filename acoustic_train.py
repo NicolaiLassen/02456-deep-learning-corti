@@ -149,4 +149,4 @@ if __name__ == "__main__":
             pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         torch.save(wav2letter.state_dict(),
-                   "./ckpt_{}_wav2letter/model/{}_wav2letter_e_{}.ckpt".format(args.loss, args.loss, epoch_i))
+                   "./ckpt_{}_wav2letter/model/{}_wav2letterss.ckpt".format(args.loss, args.loss))
