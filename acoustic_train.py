@@ -107,7 +107,7 @@ if __name__ == "__main__":
         epoch_sub_losses = []
         wav2letter.train()
 
-        for wave, texts in iter(training_loader)[:-1]:
+        for wave, texts in training_loader:
             # try catch to fix last batch size
             current_batch_size = len(texts)
 
