@@ -108,8 +108,8 @@ if __name__ == "__main__":
         wav2letter.train()
         running_loss = 0.0
 
-        for wave, texts in training_loader:
-            # try catch to fix last batch size 
+        for wave, texts in training_loader[:-1]:
+            # try catch to fix last batch size
 
             optimizer.zero_grad()
 
@@ -140,13 +140,14 @@ if __name__ == "__main__":
             # graph
             epoch_sub_losses.append(loss.item())
 
-        # lower the lr if the alg is stuck
-        scheduler.step(torch.tensor(epoch_sub_losses).mean().item())
-        epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
+# lower the lr if the alg is stuck
+epoch_loss = torch.tensor(epoch_sub_losses).mean().item()
+scheduler.step(epoch_loss)
+epoch_mean_losses.append(epoch_loss)
 
-        with open('./ckpt_{}_wav2letter/losses_epoch/epoch_mean_losses_e_{}.pkl'.format(args.loss, epoch_i),
-                  'wb') as handle:
-            pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
+with open('./ckpt_{}_wav2letter/losses_epoch/epoch_mean_losses_e_{}.pkl'.format(args.loss, epoch_i),
+          'wb') as handle:
+    pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        torch.save(wav2letter.state_dict(),
-                   "./ckpt_{}_wav2letter/model/{}_wav2letter.ckpt".format(args.loss, args.loss))
+torch.save(wav2letter.state_dict(),
+           "./ckpt_{}_wav2letter/model/{}_wav2letter.ckpt".format(args.loss, args.loss))
