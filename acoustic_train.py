@@ -77,7 +77,7 @@ if __name__ == "__main__":
         wav2letter.cuda()
 
     criterion = CTCLoss(blank=labels.index(blank), zero_infinity=True)
-    optimizer = SGD(wav2letter.parameters(), lr=lr)
+    optimizer = SGD(wav2letter.parameters(), lr=lr, momentum=0.9)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=50)
 
 
