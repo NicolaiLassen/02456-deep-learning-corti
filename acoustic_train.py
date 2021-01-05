@@ -64,9 +64,9 @@ if __name__ == "__main__":
 
     wav2letter = Wav2LetterEmbed(num_classes=len(labels), num_features=num_features)
     wav_model = Wav2vecSemantic(channels=256, prediction_steps=6)
-    # wav_model.load_state_dict(
-    #     torch.load("./ckpt_{}/model/wav2vec_semantic_{}_256_e_30.ckpt".format(args.loss, args.loss),
-    #                map_location=torch.device('cpu')))
+    wav_model.load_state_dict(
+        torch.load("./ckpt_{}/model/wav2vec_semantic_{}_256_e_30.ckpt".format(args.loss, args.loss),
+                   map_location=torch.device('cpu')))
 
     training_loader = DataLoader(dataset=train_data,
                                  batch_size=batch_size,
@@ -131,12 +131,16 @@ if __name__ == "__main__":
             # CTC loss
             loss = criterion(out_p, y, input_lengths, target_lengths)
 
+            if torch.isnan(loss) or \
+                    torch.isinf(loss):
+                continue
+
             # print(texts)
             # Backprop
             loss.backward()
             # print(loss) # test if it works
             optimizer.step()
-            # print(loss.item())
+            print(loss.item())
             # graph
             epoch_sub_losses.append(loss.item())
 
