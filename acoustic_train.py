@@ -59,14 +59,14 @@ if __name__ == "__main__":
 
     lr = 1e-3
     num_features = 256
-    batch_size = 32
+    batch_size = 64
     epochs = 10000
 
     wav2letter = Wav2LetterEmbed(num_classes=len(labels), num_features=num_features)
     wav_model = Wav2vecSemantic(channels=256, prediction_steps=6)
-    wav_model.load_state_dict(
-        torch.load("./ckpt_{}/model/wav2vec_semantic_{}_256_e_30.ckpt".format(args.loss, args.loss),
-                   map_location=torch.device('cpu')))
+    # wav_model.load_state_dict(
+    #     torch.load("./ckpt_{}/model/wav2vec_semantic_{}_256_e_30.ckpt".format(args.loss, args.loss),
+    #                map_location=torch.device('cpu')))
 
     training_loader = DataLoader(dataset=train_data,
                                  batch_size=batch_size,
@@ -106,10 +106,10 @@ if __name__ == "__main__":
         # Enter training state
         epoch_sub_losses = []
         wav2letter.train()
-        running_loss = 0.0
 
-        for wave, texts in training_loader[:-1]:
+        for wave, texts in iter(training_loader)[:-1]:
             # try catch to fix last batch size
+            current_batch_size = len(texts)
 
             optimizer.zero_grad()
 
@@ -124,10 +124,10 @@ if __name__ == "__main__":
                 c, _ = wav_model(wave)
 
             out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
-
             out_p = out.permute(2, 0, 1)  # <- log_probs in (input_length, batch_size, number_of_classes)
-            input_lengths = torch.full((batch_size,), fill_value=out_p.size(0), dtype=torch.int32)
-            target_lengths = torch.full((batch_size,), fill_value=y.shape[1], dtype=torch.int32)
+
+            input_lengths = torch.full((current_batch_size,), fill_value=out_p.size(0), dtype=torch.int32)
+            target_lengths = torch.full((current_batch_size,), fill_value=y.shape[1], dtype=torch.int32)
             # CTC loss
             loss = criterion(out_p, y, input_lengths, target_lengths)
 
@@ -140,14 +140,14 @@ if __name__ == "__main__":
             # graph
             epoch_sub_losses.append(loss.item())
 
-# lower the lr if the alg is stuck
-epoch_loss = torch.tensor(epoch_sub_losses).mean().item()
-scheduler.step(epoch_loss)
-epoch_mean_losses.append(epoch_loss)
+        # lower the lr if the alg is stuck
+        epoch_loss = torch.tensor(epoch_sub_losses).mean().item()
+        scheduler.step(epoch_loss)
+        epoch_mean_losses.append(epoch_loss)
 
-with open('./ckpt_{}_wav2letter/losses_epoch/epoch_mean_losses_e_{}.pkl'.format(args.loss, epoch_i),
-          'wb') as handle:
-    pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open('./ckpt_{}_wav2letter/losses_epoch/epoch_mean_losses_e_{}.pkl'.format(args.loss, epoch_i),
+                  'wb') as handle:
+            pickle.dump(epoch_mean_losses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-torch.save(wav2letter.state_dict(),
-           "./ckpt_{}_wav2letter/model/{}_wav2letter.ckpt".format(args.loss, args.loss))
+        torch.save(wav2letter.state_dict(),
+                   "./ckpt_{}_wav2letter/model/{}_wav2letter.ckpt".format(args.loss, args.loss))
