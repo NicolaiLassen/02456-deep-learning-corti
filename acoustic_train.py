@@ -1,13 +1,15 @@
 import argparse
 import os
 import pickle
+from typing import List
 
 import seaborn as sns
 import torch
 import torchaudio
 from torch.fft import Tensor
 from torch.nn import CTCLoss
-from torch.optim import lr_scheduler, SGD
+from torch.nn.utils.rnn import pad_sequence
+from torch.optim import lr_scheduler, Adam
 from torch.utils.data import DataLoader
 
 from models.Wav2LetterEmbed import Wav2LetterEmbed
@@ -76,28 +78,25 @@ if __name__ == "__main__":
         wav_model.cuda()
         wav2letter.cuda()
 
-    criterion = CTCLoss(blank=labels.index(blank), zero_infinity=True)
-    optimizer = SGD(wav2letter.parameters(), lr=lr, momentum=0.9)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=50)
+    criterion = CTCLoss(blank=labels.index(blank))
+    optimizer = Adam(wav2letter.parameters(), lr=lr)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6)
+
+
+    def sentence_to_idx(sentence) -> List:
+        y = []
+        for char in sentence:
+            try:
+                y.append(char2index[char])
+            except:
+                continue
+        return y
 
 
     def max_pad_batch_idx(transcripts) -> Tensor:
         with torch.no_grad():
-            y = []
-            len_max = len(max(transcripts, key=len))
-            for i, sentence in enumerate(transcripts):
-                y.append([])
-                for char in sentence.lower():
-                    try:
-                        y[i].append(char2index[char])
-                    except Exception as e:
-                        print(e)
-                        continue
-                # pad to longest
-                y[i] += [labels.index(blank)] * (len_max - len(y[i]))
-
-            # return int16 tensor
-            return torch.tensor(y, dtype=torch.int16)
+            y = [torch.tensor(sentence_to_idx(sentence)) for sentence in transcripts]
+            return pad_sequence(y, batch_first=True, padding_value=labels.index(blank))
 
 
     wav_model.eval()
@@ -107,43 +106,42 @@ if __name__ == "__main__":
         # Enter training state
         epoch_sub_losses = []
         wav2letter.train()
+        running_loss = 0.0
 
         for wave, texts in training_loader:
             # try catch to fix last batch size 
-            try:
-                optimizer.zero_grad()
 
-                torch.cuda.empty_cache()
+            optimizer.zero_grad()
 
-                y = max_pad_batch_idx(texts)
+            torch.cuda.empty_cache()
 
-                if train_on_gpu:
-                    y, wave = y.cuda(), wave.cuda()
+            y = max_pad_batch_idx(texts)
 
-                with torch.no_grad():
-                    c, _ = wav_model(wave)
+            if train_on_gpu:
+                y, wave = y.cuda(), wave.cuda()
 
-                out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
+            with torch.no_grad():
+                c, _ = wav_model(wave)
 
-                out_p = out.permute(2, 0, 1)  # <- log_probs in (input_length, batch_size, number_of_classes)
-                input_lengths = torch.full((batch_size,), fill_value=out_p.size(0), dtype=torch.int32)
-                target_lengths = torch.full((batch_size,), fill_value=y.size(1), dtype=torch.int32)
-                # CTC loss
-                loss = criterion(out_p, y, input_lengths, target_lengths)
+            out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
 
-                # print(texts)
-                # Backprop
-                loss.backward()
-                # print(loss) # test if it works
-                optimizer.step()
-                # lower the lr if the alg is stuck
-                scheduler.step(loss)
-                # print(loss.item())
-                # graph
-                epoch_sub_losses.append(loss.item())
-            except:
-                continue
+            out_p = out.permute(2, 0, 1)  # <- log_probs in (input_length, batch_size, number_of_classes)
+            input_lengths = torch.full((batch_size,), fill_value=out_p.size(0), dtype=torch.int32)
+            target_lengths = torch.full((batch_size,), fill_value=y.shape[1], dtype=torch.int32)
+            # CTC loss
+            loss = criterion(out_p, y, input_lengths, target_lengths)
 
+            # print(texts)
+            # Backprop
+            loss.backward()
+            # print(loss) # test if it works
+            optimizer.step()
+            # print(loss.item())
+            # graph
+            epoch_sub_losses.append(loss.item())
+
+        # lower the lr if the alg is stuck
+        scheduler.step(torch.tensor(epoch_sub_losses).mean().item())
         epoch_mean_losses.append(torch.tensor(epoch_sub_losses).mean().item())
 
         with open('./ckpt_{}_wav2letter/losses_epoch/epoch_mean_losses_e_{}.pkl'.format(args.loss, epoch_i),

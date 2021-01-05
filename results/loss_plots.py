@@ -31,18 +31,18 @@ if __name__ == "__main__":
     # plt.title("Contrastive + Triplet loss")
     # plt.xlabel("Epoch")
     # plt.show()
-    with (open("epoch_mean_losses_e_169_con.pkl", "rb")) as openfile:
+    with (open("epoch_mean_losses_e_1157.pkl", "rb")) as openfile:
         con = pickle.load(openfile)
 
-    with (open("epoch_mean_losses_e_169_con_triplet.pkl", "rb")) as openfile:
-        loss_con_triplet = pickle.load(openfile)
-
-    with (open("epoch_mean_losses_e_169_triplet.pkl", "rb")) as openfile:
-        loss_triplet = pickle.load(openfile)
+    # with (open("epoch_mean_losses_e_169_con_triplet.pkl", "rb")) as openfile:
+    #     loss_con_triplet = pickle.load(openfile)
+    #
+    # with (open("epoch_mean_losses_e_169_triplet.pkl", "rb")) as openfile:
+    #     loss_triplet = pickle.load(openfile)
 
     plt.plot(con, label='Con')
-    plt.plot(loss_con_triplet, label='Con Triplet')
-    plt.plot(loss_triplet, label='Triplet')
+    # plt.plot(loss_con_triplet, label='Con Triplet')
+    # plt.plot(loss_triplet, label='Triplet')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Wav2letter loss plots')
