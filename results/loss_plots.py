@@ -31,7 +31,7 @@ if __name__ == "__main__":
     # plt.title("Contrastive + Triplet loss")
     # plt.xlabel("Epoch")
     # plt.show()
-    with (open("epoch_mean_losses_e_71.pkl", "rb")) as openfile:
+    with (open("epoch_mean_losses_e_976.pkl", "rb")) as openfile:
         con = pickle.load(openfile)
 
     print(con)
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     # with (open("epoch_mean_losses_e_169_triplet.pkl", "rb")) as openfile:
     #     loss_triplet = pickle.load(openfile)
 
-    plt.plot(con, label='Con')
+    plt.plot(con[220:], label='Con')
     # plt.plot(loss_con_triplet, label='Con Triplet')
     # plt.plot(loss_triplet, label='Triplet')
     plt.xlabel('Epoch')

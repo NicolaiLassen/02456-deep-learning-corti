@@ -29,7 +29,7 @@ def create_dir(directory):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-l", "--loss", default="con", help="verbose output")
+    parser.add_argument("-l", "--loss", default="con_triplet", help="verbose output")
     args = parser.parse_args()
 
     if args.loss not in ["con", "triplet", "con_triplet"]:
@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     criterion = CTCLoss(blank=labels.index(blank))
     optimizer = Adam(wav2letter.parameters(), lr=lr)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.50, patience=6)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.90, patience=10)
 
 
     def sentence_to_idx(sentence) -> List:

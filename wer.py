@@ -1,10 +1,12 @@
 import argparse
 import os
+from typing import List
 
 import seaborn as sns
 import torch
 import torchaudio
 from torch.fft import Tensor
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 
 from models.Wav2LetterEmbed import Wav2LetterEmbed
@@ -72,23 +74,21 @@ if __name__ == "__main__":
                                  shuffle=False)
     decoder = CTCBeamDecoder("./lm/lm_librispeech_kenlm_word_4g_200kvocab.bin")
 
+
+    def sentence_to_idx(sentence) -> List:
+        y = []
+        for char in sentence:
+            try:
+                y.append(char2index[char])
+            except:
+                continue
+        return y
+
+
     def max_pad_batch_idx(transcripts) -> Tensor:
         with torch.no_grad():
-            y = []
-            len_max = len(max(transcripts, key=len))
-            for i, sentence in enumerate(transcripts):
-                y.append([])
-                for char in sentence.lower():
-                    try:
-                        y[i].append(char2index[char])
-                    except Exception as e:
-                        print(e)
-                        continue
-                # pad to longest
-                y[i] += [labels.index(blank)] * (len_max - len(y[i]))
-
-            # return int16 tensor
-            return torch.tensor(y, dtype=torch.int16)
+            y = [torch.tensor(sentence_to_idx(sentence)) for sentence in transcripts]
+            return pad_sequence(y, batch_first=True, padding_value=labels.index(blank))
 
 
     wav_model.eval()
@@ -106,8 +106,9 @@ if __name__ == "__main__":
             with torch.no_grad():
                 c, _ = wav_model(wave)
 
+            print(texts)
             out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
-            decoded = decoder(out.permute(0, 2, 1))# <- beam in (batch_size, input_length, number_of_classes)
+            decoded = decoder(out.permute(0, 2, 1))  # <- beam in (batch_size, input_length, number_of_classes)
             print(decoded)
 
         break
