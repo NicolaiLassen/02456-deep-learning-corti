@@ -11,7 +11,7 @@ labels = [
 
 
 class CTCBeamDecoder:
-    def __init__(self, kenlm_path, beam_size=1000):
+    def __init__(self, kenlm_path, beam_size=2000):
         self.decoder = ctcdecode.CTCBeamDecoder(
             labels,
             log_probs_input=True,

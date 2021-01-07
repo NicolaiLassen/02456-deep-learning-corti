@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 
 from models.Wav2LetterEmbed import Wav2LetterEmbed
 from models.Wav2VecSemantic import Wav2vecSemantic
+from results.scorer import get_asr_metric
 from utils.decoder import CTCBeamDecoder
 from utils.training import collate
 
@@ -106,9 +107,10 @@ if __name__ == "__main__":
             with torch.no_grad():
                 c, _ = wav_model(wave)
 
-            print(texts)
+            target = "".join(texts)
             out = wav2letter(c)  # -> out (batch_size, number_of_classes, input_length).
             decoded = decoder(out.permute(0, 2, 1))  # <- beam in (batch_size, input_length, number_of_classes)
             print(decoded)
+            print(get_asr_metric([target], [decoded]))
 
         break

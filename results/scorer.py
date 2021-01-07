@@ -24,5 +24,4 @@ def get_asr_metric(ground_truths, hypotheses):
 
 
 if __name__ == '__main__':
-    train_data = torchaudio.datasets.LIBRISPEECH("./data/", url="train-clean-100", download=True)
-
+    print(get_asr_metric("test", "test"))
