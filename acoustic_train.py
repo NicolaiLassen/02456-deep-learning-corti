@@ -64,11 +64,11 @@ if __name__ == "__main__":
 
     wav2letter = Wav2LetterEmbed(num_classes=len(labels), num_features=num_features)
     wav2letter.load_state_dict(
-        torch.load("./ckpt_{}_wav2letter/model/{}_wav2letter.ckpt".format(args.loss, args.loss),
+        torch.load("./ckpt_{}_wav2letter/model/{}_wav2letter_pre.ckpt".format(args.loss, args.loss),
                    map_location=torch.device('cpu')
                    ),
     )
-    
+
     wav_model = Wav2vecSemantic(channels=256, prediction_steps=6)
     wav_model.load_state_dict(
         torch.load("./ckpt_{}/model/wav2vec_semantic_{}_256_e_30.ckpt".format(args.loss, args.loss),
