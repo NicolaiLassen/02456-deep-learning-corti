@@ -57,7 +57,7 @@ if __name__ == "__main__":
         **{i: label for i, label in enumerate(labels)},
     }
 
-    lr = 1e-4
+    lr = 1e-3
     num_features = 256
     batch_size = 64
     epochs = 10000
@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     criterion = CTCLoss(blank=labels.index(blank))
     optimizer = Adam(wav2letter.parameters(), lr=lr)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.90, patience=10)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.99, patience=10)
 
 
     def sentence_to_idx(sentence) -> List:

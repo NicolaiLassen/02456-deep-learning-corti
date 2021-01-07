@@ -34,14 +34,14 @@ if __name__ == "__main__":
     # with (open("epoch_mean_losses_e_190.pkl", "rb")) as openfile:
     #     con = pickle.load(openfile)
 
-    with (open("epoch_mean_losses_e_1671.pkl", "rb")) as openfile:
+    with (open("epoch_mean_losses_e_667.pkl", "rb")) as openfile:
         loss_con_triplet = pickle.load(openfile)
-    #
+    print(loss_con_triplet)
     # with (open("epoch_mean_losses_e_169_triplet.pkl", "rb")) as openfile:
     #     loss_triplet = pickle.load(openfile)
 
     # plt.plot(con[1:], label='Con')
-    plt.plot(loss_con_triplet[1:], label='Con Triplet')
+    plt.plot(loss_con_triplet[250:], label='Con Triplet')
     # plt.plot(loss_triplet, label='Triplet')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
